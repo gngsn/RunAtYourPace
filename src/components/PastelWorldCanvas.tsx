@@ -20,10 +20,13 @@ import { ARTWORK_THEMES } from '../utils/gpxParser';
 import { soundEngine } from '../utils/soundEffects';
 
 export type LaneIndex = -1 | 0 | 1;
-export const LANE_WIDTH = 1.55; // Distance between adjacent lanes (-1.55, 0, +1.55)
+export const LANE_WIDTH = 1.85; // Wide, unmistakable spacing for Lane 1 (-1.85), Lane 2 (0), Lane 3 (+1.85)
+export const POINTS_PER_COIN = 100; // Score is strictly proportional to coins collected (1 Coin = 100 PTS)
+export const FIXED_PLAYBACK_SPEED = 2; // Locked at 2x speed
 
 export interface GameStatsUpdate {
   coins: number;
+  totalCoins: number;
   score: number;
   combo: number;
   maxCombo: number;
@@ -31,13 +34,30 @@ export interface GameStatsUpdate {
   feverTimeLeft: number;
   lastEventLabel: string | null;
   currentLane: LaneIndex;
+  carriedItems: string[];
+  runElapsedSeconds: number;
+  vsPastYouSeconds: number;
+}
+
+export interface CourseCompletePayload {
+  courseId: string;
+  coins: number;
+  totalCoins: number;
+  score: number;
+  maxCombo: number;
+  elapsedSeconds: number;
+  vsPastYouSeconds: number;
 }
 
 export interface RunnerControlActions {
   moveLeft: () => void;
   moveRight: () => void;
+  setLane: (lane: LaneIndex) => void;
   jump: () => void;
+  useOldestItem: () => void;
+  useItemSlot: (slotIndex: number) => void;
   resetCollectibles: () => void;
+  finishRunNow: () => void;
 }
 
 // Pre-allocated math objects outside render loop (Zero GC)
@@ -68,16 +88,17 @@ interface TrackCollectible {
   id: number;
   t: number; // 0..1 spline ratio
   lane: LaneIndex;
-  type: 'coin' | 'boost_star' | 'cloud_hurdle';
-  elevOffset: number; // 0 for normal, 1.35 for high jump arc coin
+  type: 'coin' | 'star_coin' | 'cloud_hurdle';
+  coinValue: number; // 1 for standard gold coin (+100 pts), 5 for big star coin (+500 pts)
+  elevOffset: number;
   worldPos: THREE.Vector3;
   tangentAngle: number;
   collected: boolean;
 }
 
 /**
- * Generates a high-contrast 3-LANE running track texture with 2 crisp dashed lane dividers,
- * alternating lane shading, and directional chevrons in each of the 3 lanes.
+ * Generates an unmistakable 3-LANE running track texture with 3 distinct lane colors,
+ * bold white dashed lane dividers, and directional chevrons in each of the 3 lanes.
  */
 function createThreeLaneTrackTexture(
   roadHex: string,
@@ -95,19 +116,20 @@ function createThreeLaneTrackTexture(
   ctx.fillStyle = roadHex;
   ctx.fillRect(0, 0, W, H);
 
-  const shoulderW = 28;
+  const shoulderW = 24;
   const innerW = W - shoulderW * 2;
   const laneW = innerW / 3;
 
-  // 3 Distinct Lanes with subtle surface contrast
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.09)';
+  // Lane 1 (Left) and Lane 3 (Right) subtle tint
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.14)';
   ctx.fillRect(shoulderW, 0, laneW, H);
   ctx.fillRect(shoulderW + laneW * 2, 0, laneW, H);
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+  // Lane 2 (Center) bright highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
   ctx.fillRect(shoulderW + laneW, 0, laneW, H);
 
-  // Bold outer shoulder curbs
+  // Outer shoulder curbs
   ctx.fillStyle = borderHex;
   ctx.fillRect(0, 0, shoulderW, H);
   ctx.fillRect(W - shoulderW, 0, shoulderW, H);
@@ -116,20 +138,24 @@ function createThreeLaneTrackTexture(
   ctx.fillRect(shoulderW - 6, 0, 6, H);
   ctx.fillRect(W - shoulderW, 0, 6, H);
 
-  // Two crisp dashed lane divider lines
+  // Two high-contrast dashed lane divider lines separating the 3 lanes
   const div1X = shoulderW + laneW;
   const div2X = shoulderW + laneW * 2;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+  ctx.fillRect(div1X - 7, 0, 14, H);
+  ctx.fillRect(div2X - 7, 0, 14, H);
 
   ctx.fillStyle = '#FFFFFF';
   for (let y = 0; y < H; y += 64) {
     ctx.beginPath();
-    ctx.roundRect(div1X - 4, y + 10, 8, 36, 4);
-    ctx.roundRect(div2X - 4, y + 10, 8, 36, 4);
+    ctx.roundRect(div1X - 5, y + 8, 10, 40, 5);
+    ctx.roundRect(div2X - 5, y + 8, 10, 40, 5);
     ctx.fill();
   }
 
   // Forward directional chevrons (>>>) inside each of the 3 lanes
-  ctx.lineWidth = 6;
+  ctx.lineWidth = 7;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
@@ -143,9 +169,9 @@ function createThreeLaneTrackTexture(
     ctx.strokeStyle = laneIdx === 1 ? borderHex : stripeHex;
     for (let y = 44; y < H; y += 128) {
       ctx.beginPath();
-      ctx.moveTo(cx - 24, y + 22);
+      ctx.moveTo(cx - 26, y + 24);
       ctx.lineTo(cx, y);
-      ctx.lineTo(cx + 24, y + 22);
+      ctx.lineTo(cx + 26, y + 24);
       ctx.stroke();
     }
   });
@@ -164,7 +190,6 @@ interface PastelWorldCanvasProps {
   characterId: CharacterModelId;
   cameraMode: CameraModeId;
   isPlaying: boolean;
-  playbackSpeed: number;
   progressRatio: number;
   isAutoPlay: boolean;
   selectedLandmarkId: string | null;
@@ -172,6 +197,7 @@ interface PastelWorldCanvasProps {
   onProgressTick: (newRatio: number, currentPointIdx: number) => void;
   onSelectLandmark: (landmark: SurroundingLandmark | null) => void;
   onGameStatsUpdate: (stats: GameStatsUpdate) => void;
+  onCourseComplete: (payload: CourseCompletePayload) => void;
 }
 
 export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
@@ -180,7 +206,6 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
   characterId,
   cameraMode,
   isPlaying,
-  playbackSpeed,
   progressRatio,
   isAutoPlay,
   selectedLandmarkId,
@@ -188,8 +213,14 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
   onProgressTick,
   onSelectLandmark,
   onGameStatsUpdate,
+  onCourseComplete,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const onCourseCompleteRef = useRef(onCourseComplete);
+
+  useEffect(() => {
+    onCourseCompleteRef.current = onCourseComplete;
+  }, [onCourseComplete]);
 
   const stateRef = useRef({
     course,
@@ -197,7 +228,6 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     characterId,
     cameraMode,
     isPlaying,
-    playbackSpeed,
     progressRatio,
     isAutoPlay,
     selectedLandmarkId,
@@ -208,23 +238,30 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     sprintBoost: 0,
     feverTimer: 0,
     coins: 0,
+    totalCoins: 0,
     score: 0,
     combo: 0,
     maxCombo: 0,
     lastEventLabel: null as string | null,
+    hasCompletedCurrentRun: false,
+    carriedItems: ['Magnet Fever', 'Coin Surge +3'] as string[],
+    runElapsedSeconds: 0,
+    vsPastYouSeconds: -1.8,
   });
 
   useEffect(() => {
     stateRef.current.isPlaying = isPlaying;
-    stateRef.current.playbackSpeed = playbackSpeed;
     stateRef.current.cameraMode = cameraMode;
     stateRef.current.isAutoPlay = isAutoPlay;
     stateRef.current.selectedLandmarkId = selectedLandmarkId;
-  }, [isPlaying, playbackSpeed, cameraMode, isAutoPlay, selectedLandmarkId]);
+  }, [isPlaying, cameraMode, isAutoPlay, selectedLandmarkId]);
 
   useEffect(() => {
     if (Math.abs(stateRef.current.progressRatio - progressRatio) > 0.002) {
       stateRef.current.progressRatio = progressRatio;
+      if (progressRatio < 0.98) {
+        stateRef.current.hasCompletedCurrentRun = false;
+      }
     }
   }, [progressRatio]);
 
@@ -427,7 +464,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
 
-    // Needle-Felt Runner Rig + Fever Aura Ring
+    // Needle-Felt Runner Rig + Active Lane Indicator Pad + Fever Aura Ring
     const runnerRig: FeltRunnerRig = createFeltRunnerRig(
       fuzzyBumpTex,
       softShadowTex,
@@ -435,6 +472,19 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       stateRef.current.characterId
     );
     scene.add(runnerRig.root);
+
+    // Glowing Lane Indicator Ring under Runner so current lane (1, 2, 3) is crystal clear
+    const lanePadGeo = new THREE.RingGeometry(0.58, 0.78, 28);
+    const lanePadMat = new THREE.MeshBasicMaterial({
+      color: '#76FFB2',
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const lanePadMesh = new THREE.Mesh(lanePadGeo, lanePadMat);
+    lanePadMesh.rotation.x = Math.PI / 2;
+    lanePadMesh.position.y = 0.06;
+    runnerRig.root.add(lanePadMesh);
 
     const feverRingGeo = new THREE.TorusGeometry(0.95, 0.08, 12, 32);
     const feverRingMat = new THREE.MeshBasicMaterial({
@@ -541,16 +591,16 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     const courseGroup = new THREE.Group();
     scene.add(courseGroup);
 
-    // Collectibles InstancedMeshes
-    const MAX_COINS = 160;
-    const coinOuterGeo = new THREE.TorusGeometry(0.42, 0.14, 12, 24);
+    // Dense 3-Lane Collectibles InstancedMeshes (Up to 360 Gold Coins + 36 Big Star Coins + 32 Hurdles)
+    const MAX_COINS = 360;
+    const coinOuterGeo = new THREE.TorusGeometry(0.46, 0.15, 12, 24);
     const coinOuterMat = new THREE.MeshPhysicalMaterial({
       color: '#FACC15',
-      roughness: 0.25,
-      metalness: 0.65,
-      clearcoat: 0.8,
+      roughness: 0.22,
+      metalness: 0.68,
+      clearcoat: 0.85,
       emissive: new THREE.Color('#F59E0B'),
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.42,
     });
     const coinOuterInst = new THREE.InstancedMesh(
       coinOuterGeo,
@@ -560,7 +610,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     coinOuterInst.frustumCulled = false;
     scene.add(coinOuterInst);
 
-    const coinCoreGeo = new THREE.OctahedronGeometry(0.26, 0);
+    const coinCoreGeo = new THREE.OctahedronGeometry(0.28, 0);
     const coinCoreMat = new THREE.MeshBasicMaterial({ color: '#FEF08A' });
     const coinCoreInst = new THREE.InstancedMesh(
       coinCoreGeo,
@@ -570,15 +620,15 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     coinCoreInst.frustumCulled = false;
     scene.add(coinCoreInst);
 
-    const MAX_BOOST_STARS = 24;
-    const boostStarGeo = new THREE.OctahedronGeometry(0.62, 0);
+    const MAX_BOOST_STARS = 40;
+    const boostStarGeo = new THREE.OctahedronGeometry(0.65, 0);
     const boostStarMat = new THREE.MeshPhysicalMaterial({
       color: '#FF85B8',
       roughness: 0.18,
       metalness: 0.3,
       transmission: 0.4,
       emissive: new THREE.Color('#76FFB2'),
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.6,
     });
     const boostStarInst = new THREE.InstancedMesh(
       boostStarGeo,
@@ -588,8 +638,8 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     boostStarInst.frustumCulled = false;
     scene.add(boostStarInst);
 
-    const MAX_HURDLES = 30;
-    const hurdleGeo = new THREE.CapsuleGeometry(0.45, 0.75, 12, 18);
+    const MAX_HURDLES = 36;
+    const hurdleGeo = new THREE.CapsuleGeometry(0.45, 0.82, 12, 18);
     hurdleGeo.rotateZ(Math.PI / 2);
     const hurdleMat = createFeltMaterial('#FDA4AF', fuzzyBumpTex, {
       sheenColorHex: '#FFFFFF',
@@ -620,6 +670,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       const st = stateRef.current;
       onGameStatsUpdate({
         coins: st.coins,
+        totalCoins: st.totalCoins,
         score: st.score,
         combo: st.combo,
         maxCombo: st.maxCombo,
@@ -627,102 +678,110 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         feverTimeLeft: st.feverTimer,
         lastEventLabel: st.lastEventLabel,
         currentLane: st.currentLane,
+        carriedItems: [...st.carriedItems],
+        runElapsedSeconds: st.runElapsedSeconds,
+        vsPastYouSeconds: st.vsPastYouSeconds,
       });
     };
 
+    /**
+     * Densely populates all 3 lanes with continuous coin streaks, diagonal lane-switch waves,
+     * and bonus 5-coin Star Gems so every coin collected directly adds +100 pts to the score.
+     */
     const generateCourseCollectibles = (curve: THREE.CatmullRomCurve3) => {
       collectibles = [];
       const lanes: LaneIndex[] = [-1, 0, 1];
       let idCounter = 0;
+      let totalCoinValueCount = 0;
 
-      const totalWaves = 28;
+      const totalWaves = 52;
       for (let w = 0; w < totalWaves; w++) {
-        const baseT = 0.02 + (w / totalWaves) * 0.94;
-        const laneChoice = lanes[(w * 7 + 1) % 3];
+        const baseT = 0.012 + (w / totalWaves) * 0.965;
+        const primaryLane = lanes[(w * 5 + 1) % 3];
 
-        if (w % 4 === 3) {
-          const hurdleLane = lanes[w % 3];
-          const tHurdle = baseT;
-          curve.getPointAt(tHurdle, _curvePos);
-          curve.getTangentAt(tHurdle, _tangent).normalize();
+        // 5-coin continuous line or diagonal 3-lane staircase in every wave
+        const pattern = w % 4;
+        for (let c = 0; c < 5; c++) {
+          const tCoin = Math.min(0.992, baseT + c * 0.0032);
+          let coinLane: LaneIndex = primaryLane;
+          if (pattern === 1) {
+            coinLane = lanes[c % 3]; // Diagonal Left -> Center -> Right
+          } else if (pattern === 2) {
+            coinLane = lanes[2 - (c % 3)]; // Diagonal Right -> Center -> Left
+          }
+
+          curve.getPointAt(tCoin, _curvePos);
+          curve.getTangentAt(tCoin, _tangent).normalize();
           _right.crossVectors(_tangent, _up).normalize();
-          const hPos = _curvePos
+          const cPos = _curvePos
             .clone()
-            .addScaledVector(_right, hurdleLane * LANE_WIDTH);
-          hPos.y += 0.58;
-          const angle = Math.atan2(_tangent.x, _tangent.z);
+            .addScaledVector(_right, coinLane * LANE_WIDTH);
+
+          const isHighJumpCoin = pattern === 3 && c === 2;
+          const elevOffset = isHighJumpCoin ? 1.35 : 0;
+          cPos.y += 1.05 + elevOffset;
 
           collectibles.push({
             id: idCounter++,
-            t: tHurdle,
-            lane: hurdleLane,
-            type: 'cloud_hurdle',
-            elevOffset: 0,
-            worldPos: hPos,
-            tangentAngle: angle,
-            collected: false,
-          });
-
-          const jumpCoinPos = hPos.clone();
-          jumpCoinPos.y += 1.35;
-          collectibles.push({
-            id: idCounter++,
-            t: tHurdle,
-            lane: hurdleLane,
+            t: tCoin,
+            lane: coinLane,
             type: 'coin',
-            elevOffset: 1.35,
-            worldPos: jumpCoinPos,
-            tangentAngle: angle,
+            coinValue: 1,
+            elevOffset,
+            worldPos: cPos,
+            tangentAngle: Math.atan2(_tangent.x, _tangent.z),
             collected: false,
           });
+          totalCoinValueCount += 1;
 
-          const starLane = lanes[(w + 1) % 3];
-          const tStar = Math.min(0.99, baseT + 0.012);
+          // Place a soft cloud hurdle under the high-jump coin
+          if (isHighJumpCoin) {
+            const hPos = _curvePos
+              .clone()
+              .addScaledVector(_right, coinLane * LANE_WIDTH);
+            hPos.y += 0.58;
+            collectibles.push({
+              id: idCounter++,
+              t: tCoin,
+              lane: coinLane,
+              type: 'cloud_hurdle',
+              coinValue: 0,
+              elevOffset: 0,
+              worldPos: hPos,
+              tangentAngle: Math.atan2(_tangent.x, _tangent.z),
+              collected: false,
+            });
+          }
+        }
+
+        // Every 3rd wave, place a Big Star Coin (+5 Coins = +500 PTS + Magnet Fever) in an adjacent lane!
+        if (w % 3 === 1) {
+          const starLane = lanes[(w + 2) % 3];
+          const tStar = Math.min(0.994, baseT + 0.015);
           curve.getPointAt(tStar, _curvePos);
           curve.getTangentAt(tStar, _tangent).normalize();
           _right.crossVectors(_tangent, _up).normalize();
           const sPos = _curvePos
             .clone()
             .addScaledVector(_right, starLane * LANE_WIDTH);
-          sPos.y += 1.15;
+          sPos.y += 1.18;
           collectibles.push({
             id: idCounter++,
             t: tStar,
             lane: starLane,
-            type: 'boost_star',
+            type: 'star_coin',
+            coinValue: 5,
             elevOffset: 0.2,
             worldPos: sPos,
             tangentAngle: Math.atan2(_tangent.x, _tangent.z),
             collected: false,
           });
-        } else {
-          const isDiagonal = w % 3 === 2;
-          for (let c = 0; c < 5; c++) {
-            const tCoin = Math.min(0.99, baseT + c * 0.0055);
-            const coinLane: LaneIndex = isDiagonal
-              ? lanes[c % 3]
-              : laneChoice;
-            curve.getPointAt(tCoin, _curvePos);
-            curve.getTangentAt(tCoin, _tangent).normalize();
-            _right.crossVectors(_tangent, _up).normalize();
-            const cPos = _curvePos
-              .clone()
-              .addScaledVector(_right, coinLane * LANE_WIDTH);
-            cPos.y += 1.05;
-
-            collectibles.push({
-              id: idCounter++,
-              t: tCoin,
-              lane: coinLane,
-              type: 'coin',
-              elevOffset: 0,
-              worldPos: cPos,
-              tangentAngle: Math.atan2(_tangent.x, _tangent.z),
-              collected: false,
-            });
-          }
+          totalCoinValueCount += 5;
         }
       }
+
+      stateRef.current.totalCoins = totalCoinValueCount;
+      emitGameStats();
     };
 
     const isFarFromTrack = (
@@ -752,7 +811,6 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         (pt) => new THREE.Vector3(pt.worldX, pt.worldY, pt.worldZ)
       );
 
-      // Centripetal Catmull-Rom spline with high arcLengthDivisions prevents any self-intersecting loops or kinks
       activeCurve = new THREE.CatmullRomCurve3(
         curveVectors,
         false,
@@ -760,8 +818,6 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         0.5
       );
       activeCurve.arcLengthDivisions = 2400;
-
-      // Initialize smoothed tangent to the starting direction
       activeCurve.getTangentAt(0, _smoothedTangent).normalize();
 
       generateCourseCollectibles(activeCurve);
@@ -772,8 +828,8 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         sampledTrackPts.push(activeCurve.getPointAt(i / 160));
       }
 
-      // 1. Wide 3-Lane Raised 3D Running Roadbed (width = 5.2)
-      const trackWidth = 5.2;
+      // 1. Wide 3-Lane Raised 3D Running Roadbed (width = 6.0 for 3 generous 1.85m lanes)
+      const trackWidth = 6.0;
       const roadHeight = 0.22;
       const trackPositions: number[] = [];
       const trackNormals: number[] = [];
@@ -782,6 +838,8 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
 
       const leftCurbPoints: THREE.Vector3[] = [];
       const rightCurbPoints: THREE.Vector3[] = [];
+      const laneDivider1Points: THREE.Vector3[] = [];
+      const laneDivider2Points: THREE.Vector3[] = [];
 
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
@@ -796,11 +854,24 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
           .clone()
           .addScaledVector(_right, trackWidth * 0.5);
 
+        const div1Pt = _curvePos
+          .clone()
+          .addScaledVector(_right, -LANE_WIDTH * 0.5);
+        const div2Pt = _curvePos
+          .clone()
+          .addScaledVector(_right, LANE_WIDTH * 0.5);
+
         leftCurbPoints.push(
           new THREE.Vector3(leftPt.x, leftPt.y + roadHeight + 0.08, leftPt.z)
         );
         rightCurbPoints.push(
           new THREE.Vector3(rightPt.x, rightPt.y + roadHeight + 0.08, rightPt.z)
+        );
+        laneDivider1Points.push(
+          new THREE.Vector3(div1Pt.x, div1Pt.y + roadHeight + 0.03, div1Pt.z)
+        );
+        laneDivider2Points.push(
+          new THREE.Vector3(div2Pt.x, div2Pt.y + roadHeight + 0.03, div2Pt.z)
         );
 
         trackPositions.push(leftPt.x, leftPt.y + roadHeight, leftPt.z);
@@ -876,6 +947,34 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       );
       courseGroup.add(leftCurbMesh, rightCurbMesh);
 
+      // Physical 3D Glowing Lane Divider Strips between Lane 1 | Lane 2 | Lane 3
+      const div1Curve = new THREE.CatmullRomCurve3(
+        laneDivider1Points,
+        false,
+        'centripetal',
+        0.5
+      );
+      const div2Curve = new THREE.CatmullRomCurve3(
+        laneDivider2Points,
+        false,
+        'centripetal',
+        0.5
+      );
+      const laneDividerMat = new THREE.MeshBasicMaterial({
+        color: '#FFFFFF',
+        transparent: true,
+        opacity: 0.78,
+      });
+      const div1Mesh = new THREE.Mesh(
+        new THREE.TubeGeometry(div1Curve, segments, 0.055, 6, false),
+        laneDividerMat
+      );
+      const div2Mesh = new THREE.Mesh(
+        new THREE.TubeGeometry(div2Curve, segments, 0.055, 6, false),
+        laneDividerMat
+      );
+      courseGroup.add(div1Mesh, div2Mesh);
+
       // Kilometer Arch Gates
       const archMat = new THREE.MeshStandardMaterial({
         color: theme.accentOrbHex,
@@ -906,6 +1005,34 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         courseGroup.add(archGroup);
       }
 
+      // Golden 3D Finish Line Portal at t = 0.992
+      activeCurve.getPointAt(0.992, _curvePos);
+      activeCurve.getTangentAt(0.992, _tangent).normalize();
+      const finishGroup = new THREE.Group();
+      finishGroup.position.copy(_curvePos);
+      finishGroup.position.y += roadHeight;
+      finishGroup.lookAt(_curvePos.clone().add(_tangent));
+
+      const finishGoldMat = new THREE.MeshStandardMaterial({
+        color: '#FACC15',
+        emissive: new THREE.Color('#F59E0B'),
+        emissiveIntensity: 0.75,
+        roughness: 0.25,
+        metalness: 0.5,
+      });
+      const finishArchMesh = new THREE.Mesh(
+        new THREE.TorusGeometry(trackWidth * 0.58, 0.28, 16, 36, Math.PI),
+        finishGoldMat
+      );
+      const finishStripeMat = new THREE.MeshBasicMaterial({ color: '#FFFFFF' });
+      const finishFloorStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(trackWidth, 0.05, 0.9),
+        finishStripeMat
+      );
+      finishFloorStrip.position.y = 0.03;
+      finishGroup.add(finishArchMesh, finishFloorStrip);
+      courseGroup.add(finishGroup);
+
       // 2. Rolling Neon-Mint & Pastel Hillsides
       const maxHills = 80;
       const hillGeo = new THREE.SphereGeometry(1, 20, 16);
@@ -934,7 +1061,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
             _samplePos.x,
             _samplePos.z,
             sampledTrackPts,
-            radius * 1.35 + 5.5
+            radius * 1.35 + 6.0
           )
         ) {
           continue;
@@ -1003,11 +1130,11 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         _right.crossVectors(_tangent, _up).normalize();
 
         const side = i % 2 === 0 ? -1 : 1;
-        const offset = 7.5 + ((i * 11) % 26);
+        const offset = 8.0 + ((i * 11) % 26);
         const hScale = 0.65 + ((i * 13) % 10) * 0.16;
 
         _samplePos.copy(_curvePos).addScaledVector(_right, side * offset);
-        if (!isFarFromTrack(_samplePos.x, _samplePos.z, sampledTrackPts, 6.2)) {
+        if (!isFarFromTrack(_samplePos.x, _samplePos.z, sampledTrackPts, 6.8)) {
           continue;
         }
 
@@ -1087,10 +1214,10 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         _right.crossVectors(_tangent, _up).normalize();
 
         const side = clusterIdx % 2 === 0 ? -1 : 1;
-        const offset = 4.2 + withinCluster * 0.7;
+        const offset = 4.6 + withinCluster * 0.7;
 
         _samplePos.copy(_curvePos).addScaledVector(_right, side * offset);
-        if (!isFarFromTrack(_samplePos.x, _samplePos.z, sampledTrackPts, 3.6)) {
+        if (!isFarFromTrack(_samplePos.x, _samplePos.z, sampledTrackPts, 4.0)) {
           continue;
         }
 
@@ -1179,7 +1306,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         );
         lmGroup.position
           .copy(_curvePos)
-          .addScaledVector(_right, sideSign * (10.2 + (lm.offsetMeters % 6)));
+          .addScaledVector(_right, sideSign * (10.5 + (lm.offsetMeters % 6)));
         lmGroup.position.y = _curvePos.y;
         lmGroup.lookAt(_curvePos.x, _curvePos.y, _curvePos.z);
 
@@ -1255,6 +1382,15 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       }
     };
 
+    const setLaneDirectly = (lane: LaneIndex) => {
+      const st = stateRef.current;
+      if (st.currentLane !== lane) {
+        st.currentLane = lane;
+        soundEngine.playLaneSwitch();
+        emitGameStats();
+      }
+    };
+
     const triggerJump = () => {
       const st = stateRef.current;
       if (st.jumpY <= 0.08) {
@@ -1264,6 +1400,51 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       }
     };
 
+    const activateItem = (itemName: string) => {
+      const st = stateRef.current;
+      if (itemName === 'Magnet Fever') {
+        st.feverTimer = 5.0;
+        st.lastEventLabel = 'Used [Magnet Fever]! Pulling all 3-lane coins!';
+      } else if (itemName === 'Coin Surge +3') {
+        st.coins += 3;
+        st.score = st.coins * POINTS_PER_COIN;
+        st.lastEventLabel = `Used [Coin Surge]! +3 Coins (+${
+          3 * POINTS_PER_COIN
+        } PTS)`;
+      } else {
+        st.feverTimer = Math.max(st.feverTimer, 3.2);
+        st.coins += 2;
+        st.score = st.coins * POINTS_PER_COIN;
+        st.lastEventLabel = `Used [Pace Boost]! +2 Coins & Speed Surge!`;
+      }
+      soundEngine.playBoostStar();
+      spawnParticles(runnerRig.root.position, 16, 'coin_burst', 1.7);
+      emitGameStats();
+    };
+
+    const useItemSlot = (slotIndex: number) => {
+      const st = stateRef.current;
+      if (slotIndex >= 0 && slotIndex < st.carriedItems.length) {
+        const [used] = st.carriedItems.splice(slotIndex, 1);
+        activateItem(used);
+      } else {
+        // Also allow 1/2/3 to switch directly to Lane 1 / Lane 2 / Lane 3
+        const targetLane = (slotIndex - 1) as LaneIndex;
+        if (targetLane === -1 || targetLane === 0 || targetLane === 1) {
+          setLaneDirectly(targetLane);
+        }
+      }
+    };
+
+    const useOldestItem = () => {
+      const st = stateRef.current;
+      if (st.carriedItems.length > 0) {
+        const used = st.carriedItems.shift()!;
+        activateItem(used);
+      }
+      triggerJump();
+    };
+
     const resetCollectibles = () => {
       collectibles.forEach((c) => {
         c.collected = false;
@@ -1271,20 +1452,58 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       stateRef.current.coins = 0;
       stateRef.current.score = 0;
       stateRef.current.combo = 0;
+      stateRef.current.maxCombo = 0;
       stateRef.current.feverTimer = 0;
-      stateRef.current.lastEventLabel = 'Coin track reset!';
+      stateRef.current.runElapsedSeconds = 0;
+      stateRef.current.vsPastYouSeconds = -0.8;
+      stateRef.current.carriedItems = ['Magnet Fever', 'Coin Surge +3'];
+      stateRef.current.hasCompletedCurrentRun = false;
+      stateRef.current.lastEventLabel =
+        'Run Started at 2.0x Speed! Collect Coins to Score (1 Coin = 100 PTS)';
       emitGameStats();
+    };
+
+    const finishRunNow = () => {
+      const st = stateRef.current;
+      if (st.hasCompletedCurrentRun) return;
+      st.hasCompletedCurrentRun = true;
+      st.progressRatio = 1;
+      st.isPlaying = false;
+      st.score = st.coins * POINTS_PER_COIN;
+      const targetParSec = 28;
+      st.vsPastYouSeconds = Number(
+        (st.runElapsedSeconds - targetParSec - st.coins * 0.08).toFixed(1)
+      );
+      st.lastEventLabel = `FINISH! Earned ${st.coins} Coins (${st.score.toLocaleString()} PTS) — Saved!`;
+      soundEngine.playBoostStar();
+      spawnParticles(runnerRig.root.position, 28, 'coin_burst', 2.4);
+      emitGameStats();
+      onCourseCompleteRef.current({
+        courseId: st.course.id,
+        coins: st.coins,
+        totalCoins: st.totalCoins,
+        score: st.score,
+        maxCombo: st.maxCombo,
+        elapsedSeconds: Math.max(1, Math.round(st.runElapsedSeconds)),
+        vsPastYouSeconds: st.vsPastYouSeconds,
+      });
     };
 
     actionsRef.current = {
       moveLeft: moveLaneLeft,
       moveRight: moveLaneRight,
+      setLane: setLaneDirectly,
       jump: triggerJump,
+      useOldestItem,
+      useItemSlot,
       resetCollectibles,
+      finishRunNow,
     };
 
     rebuildCourseRef.current = (newCourse: GpxCourseData) => {
       stateRef.current.course = newCourse;
+      stateRef.current.progressRatio = 0;
+      stateRef.current.hasCompletedCurrentRun = false;
       buildCourseWorld(newCourse);
       resetCollectibles();
     };
@@ -1311,17 +1530,23 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       ) {
         return;
       }
+      if (!stateRef.current.isPlaying) return;
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
         e.preventDefault();
         moveLaneLeft();
       } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
         e.preventDefault();
         moveLaneRight();
-      } else if (
-        e.code === 'Space' ||
-        e.code === 'ArrowUp' ||
-        e.code === 'KeyW'
-      ) {
+      } else if (e.code === 'Digit1') {
+        useItemSlot(0);
+      } else if (e.code === 'Digit2') {
+        useItemSlot(1);
+      } else if (e.code === 'Digit3') {
+        useItemSlot(2);
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        useOldestItem();
+      } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
         e.preventDefault();
         triggerJump();
       }
@@ -1380,7 +1605,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
 
       st.sprintBoost = THREE.MathUtils.damp(
         st.sprintBoost,
-        st.feverTimer > 0 ? 0.55 : 0,
+        st.feverTimer > 0 ? 0.45 : 0,
         3.0,
         dt
       );
@@ -1395,31 +1620,35 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
 
       const paceSpeedFactor = THREE.MathUtils.clamp(
         5.4 / Math.max(3.0, currentPt.paceMinPerKm),
-        0.65,
-        1.65
+        0.75,
+        1.45
       );
 
-      if (st.isPlaying) {
+      if (st.isPlaying && !st.hasCompletedCurrentRun) {
+        st.runElapsedSeconds += dt;
+        // Locked at 2x speed (FIXED_PLAYBACK_SPEED = 2)
         const baseRate =
-          0.014 *
-          st.playbackSpeed *
+          0.018 *
+          FIXED_PLAYBACK_SPEED *
           paceSpeedFactor *
-          (1 + st.sprintBoost * 0.65);
+          (1 + st.sprintBoost * 0.5);
         st.progressRatio += baseRate * dt;
+        st.vsPastYouSeconds = Number(
+          ((0.5 - st.progressRatio) * 1.2 - st.coins * 0.09).toFixed(1)
+        );
         if (st.progressRatio >= 1) {
-          st.progressRatio = 0;
-          collectibles.forEach((c) => {
-            c.collected = false;
-          });
-        }
-        uiSyncTimer += dt;
-        if (uiSyncTimer >= 0.06) {
-          uiSyncTimer = 0;
-          const nextIdx = Math.min(
-            pointCount - 1,
-            Math.floor(st.progressRatio * pointCount)
-          );
-          onProgressTick(st.progressRatio, nextIdx);
+          finishRunNow();
+          onProgressTick(1, pointCount - 1);
+        } else {
+          uiSyncTimer += dt;
+          if (uiSyncTimer >= 0.06) {
+            uiSyncTimer = 0;
+            const nextIdx = Math.min(
+              pointCount - 1,
+              Math.floor(st.progressRatio * pointCount)
+            );
+            onProgressTick(st.progressRatio, nextIdx);
+          }
         }
       }
 
@@ -1454,12 +1683,16 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       if (activeCurve) {
         const clampedT = THREE.MathUtils.clamp(st.progressRatio, 0, 0.9995);
 
-        // Exact instantaneous position and tangent at clampedT (never skewed across curves)
         activeCurve.getPointAt(clampedT, _curvePos);
-        activeCurve.getTangentAt(clampedT, _tangent).normalize();
 
-        // Smoothly damp forward heading so character rotation never snaps or wobbles
-        const headingDamp = 1 - Math.exp(-16 * dt);
+        // Compute smoothed heading over ±4 units of path (eased) so chase camera stays put on hairpins
+        const tBehind = Math.max(0, clampedT - 0.012);
+        const tAhead = Math.min(0.9995, clampedT + 0.012);
+        const ptBehind = activeCurve.getPointAt(tBehind);
+        const ptAhead = activeCurve.getPointAt(tAhead);
+        _tangent.subVectors(ptAhead, ptBehind).normalize();
+
+        const headingDamp = 1 - Math.exp(-10 * dt);
         _smoothedTangent.lerp(_tangent, headingDamp).normalize();
         _right.crossVectors(_smoothedTangent, _up).normalize();
 
@@ -1469,7 +1702,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         st.laneOffset = THREE.MathUtils.damp(
           st.laneOffset,
           targetLaneX,
-          13,
+          14,
           dt
         );
 
@@ -1494,32 +1727,33 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         lookTarget.y = runnerRig.root.position.y;
         runnerRig.root.lookAt(lookTarget);
 
-        // Natural 2-Joint Forward Running Gait Cycle (Hip + Knee + Opposite Arm)
+        // Natural 2-Joint Forward Running Gait at 2x speed
         const strideFreq =
-          (st.isPlaying ? 9.5 : 1.8) *
+          (st.isPlaying ? 11.5 : 1.8) *
           paceSpeedFactor *
-          (1 + st.sprintBoost * 0.4);
-        const swingAngle = st.isPlaying ? 0.68 * paceSpeedFactor : 0.06;
+          (1 + st.sprintBoost * 0.35);
+        const swingAngle = st.isPlaying ? 0.72 * paceSpeedFactor : 0.06;
         const phase = elapsed * strideFreq;
 
         const leftSin = Math.sin(phase);
         const rightSin = Math.sin(phase + Math.PI);
 
-        // Negative X rotation swings thigh forward (+Z); positive knee rotation bends lower leg backward (-Z)
         runnerRig.leftLegPivot.rotation.x = -leftSin * swingAngle;
         runnerRig.rightLegPivot.rotation.x = -rightSin * swingAngle;
 
         runnerRig.leftKneePivot.rotation.x = st.isPlaying
-          ? Math.max(0.08, (Math.cos(phase - 0.4) + 0.5) * 0.62 * paceSpeedFactor)
+          ? Math.max(
+              0.08,
+              (Math.cos(phase - 0.4) + 0.5) * 0.65 * paceSpeedFactor
+            )
           : 0.08;
         runnerRig.rightKneePivot.rotation.x = st.isPlaying
           ? Math.max(
               0.08,
-              (Math.cos(phase + Math.PI - 0.4) + 0.5) * 0.62 * paceSpeedFactor
+              (Math.cos(phase + Math.PI - 0.4) + 0.5) * 0.65 * paceSpeedFactor
             )
           : 0.08;
 
-        // Opposite arm swings forward in sync with opposite leg
         runnerRig.leftArmPivot.rotation.x = -rightSin * swingAngle * 0.85;
         runnerRig.rightArmPivot.rotation.x = -leftSin * swingAngle * 0.85;
 
@@ -1528,7 +1762,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
           : Math.sin(elapsed * 2) * 0.04;
         runnerRig.bodyGroup.position.y = bounce + st.jumpY;
         runnerRig.bodyGroup.rotation.x = st.isPlaying
-          ? 0.14 * paceSpeedFactor + st.sprintBoost * 0.12
+          ? 0.16 * paceSpeedFactor + st.sprintBoost * 0.12
           : 0;
         runnerRig.bodyGroup.rotation.z = (prevLaneOffset - targetLaneX) * 0.22;
 
@@ -1539,7 +1773,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
 
         if (st.isPlaying) {
           stepAccumulator += dt * paceSpeedFactor * (1 + st.sprintBoost);
-          if (stepAccumulator > 0.085) {
+          if (stepAccumulator > 0.08) {
             stepAccumulator = 0;
             const kind =
               st.feverTimer > 0
@@ -1551,7 +1785,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
           }
         }
 
-        // Update & Check Collisions for 3-Lane Coins, Boost Stars, and Cloud Hurdles
+        // Update & Check Collisions for 3-Lane Coins (Score = Coins * 100)
         let coinIdx = 0;
         let starIdx = 0;
         let hurdleIdx = 0;
@@ -1560,9 +1794,8 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         for (let i = 0; i < collectibles.length; i++) {
           const item = collectibles[i];
           if (!item.collected) {
-            // Spline-window check guarantees runner only interacts with items on the CURRENT path segment
             const splineDiff = Math.abs(item.t - st.progressRatio);
-            if (splineDiff < 0.03) {
+            if (splineDiff < 0.032) {
               const dx = item.worldPos.x - runnerRig.root.position.x;
               const dz = item.worldPos.z - runnerRig.root.position.z;
               const horizDist = Math.hypot(dx, dz);
@@ -1571,49 +1804,51 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
               if (
                 st.feverTimer > 0 &&
                 item.type === 'coin' &&
-                horizDist < 7.5 &&
+                horizDist < 7.8 &&
                 item.t >= st.progressRatio - 0.005
               ) {
-                item.worldPos.lerp(runnerRig.root.position, dt * 9);
+                item.worldPos.lerp(runnerRig.root.position, dt * 10);
               }
 
               const sameLane =
-                Math.abs(item.lane * LANE_WIDTH - st.laneOffset) < 0.95;
+                Math.abs(item.lane * LANE_WIDTH - st.laneOffset) < 1.05;
 
               if (item.type === 'coin') {
-                const pickupRadius = st.feverTimer > 0 ? 2.1 : 1.45;
+                const pickupRadius = st.feverTimer > 0 ? 2.2 : 1.55;
                 const heightMatch =
-                  item.elevOffset > 0.5 ? st.jumpY > 0.45 : true;
+                  item.elevOffset > 0.5 ? st.jumpY > 0.42 : true;
                 if (
                   horizDist < pickupRadius &&
                   (sameLane || st.feverTimer > 0) &&
                   heightMatch
                 ) {
                   item.collected = true;
-                  st.coins += 1;
+                  st.coins += item.coinValue;
+                  // Score is strictly proportional to total coins collected!
+                  st.score = st.coins * POINTS_PER_COIN;
                   st.combo += 1;
                   st.maxCombo = Math.max(st.maxCombo, st.combo);
-                  const mult = st.feverTimer > 0 ? 2 : 1;
-                  const pts = (100 + Math.min(10, st.combo) * 15) * mult;
-                  st.score += pts;
                   st.lastEventLabel =
                     item.elevOffset > 0.5
-                      ? `Jump Coin! +${pts}`
-                      : `Coin +${pts} (${st.combo}x Combo)`;
+                      ? `Jump Coin! +1 Coin (+${POINTS_PER_COIN} PTS) · Total ${st.coins} Coins`
+                      : `+1 Coin (+${POINTS_PER_COIN} PTS) · Total ${st.coins} Coins (${st.score.toLocaleString()} PTS)`;
                   soundEngine.playCoin(st.combo);
                   spawnParticles(item.worldPos, 10, 'coin_burst', 1.2);
                   statsDirty = true;
                 }
-              } else if (item.type === 'boost_star') {
-                if (horizDist < 1.65 && sameLane) {
+              } else if (item.type === 'star_coin') {
+                if (horizDist < 1.75 && sameLane) {
                   item.collected = true;
-                  st.coins += 5;
-                  st.combo += 3;
+                  st.coins += item.coinValue; // +5 Coins
+                  st.score = st.coins * POINTS_PER_COIN; // +500 PTS
+                  st.combo += 5;
                   st.maxCombo = Math.max(st.maxCombo, st.combo);
-                  st.score += 500;
                   st.feverTimer = 4.5;
-                  st.lastEventLabel =
-                    'Star Fever Boost! +500 (Magnet & 2x Score)';
+                  if (st.carriedItems.length < 3) {
+                    const pool = ['Magnet Fever', 'Coin Surge +3', 'Pace Boost'];
+                    st.carriedItems.push(pool[st.coins % pool.length]);
+                  }
+                  st.lastEventLabel = `Star Coin! +5 Coins (+500 PTS) & Item Slot Charged!`;
                   soundEngine.playBoostStar();
                   spawnParticles(item.worldPos, 18, 'coin_burst', 1.8);
                   statsDirty = true;
@@ -1621,17 +1856,16 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
               } else if (item.type === 'cloud_hurdle') {
                 if (horizDist < 1.15 && sameLane) {
                   item.collected = true;
-                  if (st.jumpY > 0.55 || st.feverTimer > 0) {
-                    st.combo += 2;
+                  if (st.jumpY > 0.52 || st.feverTimer > 0) {
+                    st.combo += 1;
                     st.maxCombo = Math.max(st.maxCombo, st.combo);
-                    st.score += 250;
-                    st.lastEventLabel = 'Nice Cloud Hurdle Jump! +250';
-                    soundEngine.playCoin(st.combo + 4);
+                    st.lastEventLabel = 'Clean Jump over Cloud Hurdle!';
+                    soundEngine.playCoin(st.combo + 2);
                     spawnParticles(item.worldPos, 10, 'cloud', 1.5);
                   } else {
                     st.combo = 0;
                     st.lastEventLabel =
-                      'Bumped Fluffy Cloud Hurdle! (Press Space to Jump)';
+                      'Bumped Cloud Hurdle! Press Space to Jump';
                     soundEngine.playCloudBump();
                     spawnParticles(item.worldPos, 14, 'cloud', 1.8);
                   }
@@ -1648,15 +1882,15 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
             } else {
               _dummy.position.copy(item.worldPos);
               _dummy.position.y += Math.sin(elapsed * 4 + item.id) * 0.14;
-              _dummy.rotation.set(0, elapsed * 3.2 + item.id * 0.4, 0);
-              _dummy.scale.setScalar(1);
+              _dummy.rotation.set(0, elapsed * 3.5 + item.id * 0.4, 0);
+              _dummy.scale.setScalar(1.05);
             }
             _dummy.updateMatrix();
             coinOuterInst.setMatrixAt(coinIdx, _dummy.matrix);
             coinCoreInst.setMatrixAt(coinIdx, _dummy.matrix);
             coinIdx++;
           } else if (
-            item.type === 'boost_star' &&
+            item.type === 'star_coin' &&
             starIdx < MAX_BOOST_STARS
           ) {
             if (item.collected) {
@@ -1721,16 +1955,68 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         );
 
         const mode = st.cameraMode;
-        if (mode === 'chase') {
+        const isWide = container.clientWidth >= 768;
+
+        if (mode === 'portrait') {
+          // Portrait camera (Home / My Routes / My Stats):
+          // On wide screens the camera pans so the character stands on the right
+          const sidePan = isWide ? -1.85 : 0;
           _camDesiredPos
             .copy(runnerRig.root.position)
-            .addScaledVector(_smoothedTangent, -8.8)
-            .addScaledVector(_right, st.laneOffset * 0.42);
-          _camDesiredPos.y = runnerRig.root.position.y + 4.5;
+            .addScaledVector(_smoothedTangent, 5.2)
+            .addScaledVector(_right, sidePan);
+          _camDesiredPos.y = runnerRig.root.position.y + 2.35;
 
           _camDesiredLook
             .copy(runnerRig.root.position)
-            .addScaledVector(_smoothedTangent, 8.0);
+            .addScaledVector(_right, sidePan);
+          _camDesiredLook.y = runnerRig.root.position.y + 1.55;
+        } else if (mode === 'portrait_char_select') {
+          // Character screen: On wide screens the camera pans 2.3 units sideways so the character stands left of the panel
+          const sidePan = isWide ? 2.3 : 0;
+          _camDesiredPos
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, 5.4)
+            .addScaledVector(_right, sidePan);
+          _camDesiredPos.y = runnerRig.root.position.y + 2.35;
+
+          _camDesiredLook
+            .copy(runnerRig.root.position)
+            .addScaledVector(_right, sidePan);
+          _camDesiredLook.y = runnerRig.root.position.y + 1.55;
+        } else if (mode === 'overview') {
+          // Preview screen: High overview of the route
+          _camDesiredPos
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, -24)
+            .addScaledVector(_right, 16);
+          _camDesiredPos.y = runnerRig.root.position.y + 26;
+
+          _camDesiredLook
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, 18);
+          _camDesiredLook.y = runnerRig.root.position.y + 1.0;
+        } else if (mode === 'finish') {
+          // Result / Finish celebration camera
+          _camDesiredPos
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, 5.8)
+            .addScaledVector(_right, Math.sin(elapsed * 0.8) * 2.2);
+          _camDesiredPos.y = runnerRig.root.position.y + 2.4;
+
+          _camDesiredLook.copy(runnerRig.root.position);
+          _camDesiredLook.y = runnerRig.root.position.y + 1.5;
+        } else if (mode === 'chase') {
+          // Spec: The chase camera sits 8.5 units behind the runner along a smoothed heading (±4 units of path, eased)
+          _camDesiredPos
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, -8.5)
+            .addScaledVector(_right, st.laneOffset * 0.32);
+          _camDesiredPos.y = runnerRig.root.position.y + 4.6;
+
+          _camDesiredLook
+            .copy(runnerRig.root.position)
+            .addScaledVector(_smoothedTangent, 8.5);
           _camDesiredLook.y = runnerRig.root.position.y + 1.4;
         } else if (mode === 'front') {
           _camDesiredPos
@@ -1778,7 +2064,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         camera.lookAt(_camDesiredLook);
 
         const targetFov =
-          50 + (paceSpeedFactor - 1) * 8 + st.sprintBoost * 6;
+          52 + (paceSpeedFactor - 1) * 7 + st.sprintBoost * 5;
         camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 4, dt);
         camera.updateProjectionMatrix();
       }

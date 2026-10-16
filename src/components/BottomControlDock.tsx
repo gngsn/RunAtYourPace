@@ -9,11 +9,14 @@ import {
   ChevronUp,
   Coins,
   Download,
+  Flag,
   Gamepad2,
+  Gauge,
   Palette,
   Pause,
   Play,
   RotateCcw,
+  Trophy,
   Volume2,
   VolumeX,
   Zap,
@@ -21,40 +24,44 @@ import {
 import {
   ArtworkThemeId,
   CameraModeId,
+  CourseRunRecord,
   GpxCourseData,
   GpxTrackPoint,
 } from '../types/gpx';
 import { ARTWORK_THEMES, formatDuration, formatPace } from '../utils/gpxParser';
-import { GameStatsUpdate, LaneIndex } from './PastelWorldCanvas';
+import {
+  GameStatsUpdate,
+  LaneIndex,
+  POINTS_PER_COIN,
+} from './PastelWorldCanvas';
 
 interface BottomControlDockProps {
   course: GpxCourseData;
   currentPoint: GpxTrackPoint;
   progressRatio: number;
   isPlaying: boolean;
-  playbackSpeed: number;
   themeId: ArtworkThemeId;
   cameraMode: CameraModeId;
   isCollapsed: boolean;
   isAutoPlay: boolean;
   isMuted: boolean;
   gameStats: GameStatsUpdate;
+  courseRecord?: CourseRunRecord;
   onTogglePlay: () => void;
   onSeekRatio: (ratio: number) => void;
-  onChangeSpeed: (speed: number) => void;
   onChangeTheme: (theme: ArtworkThemeId) => void;
   onChangeCamera: (mode: CameraModeId) => void;
   onToggleCollapse: () => void;
   onDownloadGpx: () => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
+  onSelectLane: (lane: LaneIndex) => void;
   onJump: () => void;
   onToggleAutoPlay: () => void;
   onToggleMute: () => void;
   onResetGame: () => void;
+  onFinishRunAndSave: () => void;
 }
-
-const SPEED_OPTIONS = [1, 2, 4, 8];
 
 const CAMERA_LABELS: Array<{ id: CameraModeId; label: string }> = [
   { id: 'chase', label: '3rd-Person Chase' },
@@ -64,53 +71,53 @@ const CAMERA_LABELS: Array<{ id: CameraModeId; label: string }> = [
   { id: 'first_person', label: 'First-Person' },
 ];
 
-const LANE_NAMES: Record<LaneIndex, string> = {
-  [-1]: 'Lane 1 (Left)',
-  [0]: 'Lane 2 (Center)',
-  [1]: 'Lane 3 (Right)',
-};
+const LANE_OPTIONS: Array<{ lane: LaneIndex; shortLabel: string }> = [
+  { lane: -1, shortLabel: 'Lane 1 (L)' },
+  { lane: 0, shortLabel: 'Lane 2 (C)' },
+  { lane: 1, shortLabel: 'Lane 3 (R)' },
+];
 
 export const BottomControlDock: React.FC<BottomControlDockProps> = ({
   course,
   currentPoint,
   progressRatio,
   isPlaying,
-  playbackSpeed,
   themeId,
   cameraMode,
   isCollapsed,
   isAutoPlay,
   isMuted,
   gameStats,
+  courseRecord,
   onTogglePlay,
   onSeekRatio,
-  onChangeSpeed,
   onChangeTheme,
   onChangeCamera,
   onToggleCollapse,
   onDownloadGpx,
   onMoveLeft,
   onMoveRight,
+  onSelectLane,
   onJump,
   onToggleAutoPlay,
   onToggleMute,
   onResetGame,
+  onFinishRunAndSave,
 }) => {
   const chartRef = useRef<SVGSVGElement | null>(null);
   const isDraggingRef = useRef(false);
 
   const theme = ARTWORK_THEMES[themeId];
 
-  const { eleAreaPath, eleLinePath, paceLinePath } = useMemo(() => {
+  const { paceAreaPath, paceLinePath } = useMemo(() => {
     const W = 680;
     const H = 52;
     const pts = course.points;
-    const minE = course.minElevationM;
-    const maxE = Math.max(minE + 5, course.maxElevationM);
 
     const coords = pts.map((pt, i) => {
       const x = (i / Math.max(1, pts.length - 1)) * W;
-      const y = H - 6 - ((pt.ele - minE) / (maxE - minE)) * (H - 14);
+      const normPace = Math.max(0.15, Math.min(0.92, (7.8 - pt.paceMinPerKm) / 4.2));
+      const y = H - 6 - normPace * (H - 14);
       return { x, y };
     });
 
@@ -122,17 +129,9 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
       .join(' ');
     const area = `${line} L${W},${H} L0,${H} Z`;
 
-    const paceCoords = pts.map((pt, i) => {
-      const x = (i / Math.max(1, pts.length - 1)) * W;
-      const normPace = Math.max(0, Math.min(1, (8.0 - pt.paceMinPerKm) / 4.5));
-      const y = H - 8 - normPace * (H - 18);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-
     return {
-      eleAreaPath: area,
-      eleLinePath: line,
-      paceLinePath: paceCoords.join(' '),
+      paceAreaPath: area,
+      paceLinePath: line,
     };
   }, [course]);
 
@@ -141,40 +140,34 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
     const rect = chartRef.current.getBoundingClientRect();
     const ratio = Math.max(
       0,
-      Math.min(1, (clientX - rect.left) / Math.max(1, rect.width))
+      Math.min(0.995, (clientX - rect.left) / Math.max(1, rect.width))
     );
     onSeekRatio(ratio);
   };
 
   return (
-    <div className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-20 w-[min(980px,95vw)] flex flex-col items-center pointer-events-auto">
-      {/* Tactile 3-Lane Arcade Action Pad + Live Coin/Score Bar */}
+    <div className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-20 w-[min(1020px,96vw)] flex flex-col items-center pointer-events-auto">
+      {/* Tactile 3-Lane Arcade Action Pad + Direct Coin-to-Score Readout */}
       <div className="mb-2 flex flex-wrap items-center justify-center gap-2.5 bg-[#11132E]/95 border border-white/15 rounded-2xl px-3.5 py-2 shadow-xl">
-        {/* Live Coin & Score Readout */}
-        <div className="flex items-center gap-3 pr-2 border-r border-white/10 text-xs font-mono-tabular">
+        {/* Live Coin & Score Readout (1 Coin = 100 PTS) */}
+        <div className="flex items-center gap-2.5 pr-2.5 border-r border-white/10 text-xs font-mono-tabular">
           <div className="flex items-center gap-1.5 text-[#FACC15] font-bold">
             <Coins className="w-4 h-4 text-[#FACC15]" />
-            <span>{gameStats.coins}</span>
-          </div>
-          <span className="text-slate-600" aria-hidden="true">
-            ·
-          </span>
-          <div className="text-white font-bold">
-            {gameStats.score.toLocaleString()}
-            <span className="text-[11px] font-normal text-slate-400 ml-1">
-              pts
+            <span>
+              {gameStats.coins}
+              {gameStats.totalCoins > 0 ? ` / ${gameStats.totalCoins}` : ''} Coins
             </span>
           </div>
           <span className="text-slate-600" aria-hidden="true">
             ·
           </span>
-          <div
-            className={`font-semibold ${
-              gameStats.combo >= 5 ? 'text-[#76FFB2]' : 'text-slate-300'
-            }`}
-          >
-            {gameStats.combo}x Combo
+          <div className="flex items-center gap-1 text-[#76FFB2] font-bold">
+            <Trophy className="w-3.5 h-3.5" />
+            <span>{gameStats.score.toLocaleString()} PTS</span>
           </div>
+          <span className="text-[10px] text-slate-400 hidden sm:inline">
+            (1 Coin = {POINTS_PER_COIN} PTS)
+          </span>
           {gameStats.isFever && (
             <>
               <span className="text-slate-600" aria-hidden="true">
@@ -193,7 +186,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
           <button
             type="button"
             onClick={onMoveLeft}
-            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-white flex items-center gap-1 transition-all whitespace-nowrap shrink-0 border border-white/10"
+            className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-white flex items-center gap-1 transition-all whitespace-nowrap shrink-0 border border-white/10"
             title="Switch to Left Lane (Keyboard A or ←)"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#76FFB2]" />
@@ -203,7 +196,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
           <button
             type="button"
             onClick={onJump}
-            className="px-3.5 py-1.5 rounded-xl bg-[#76FFB2] hover:bg-[#95ffbe] active:scale-95 text-xs font-bold text-[#0B0C22] flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#76FFB2] hover:bg-[#95ffbe] active:scale-95 text-xs font-bold text-[#0B0C22] flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-sm"
             title="Jump over Cloud Hurdles & grab Air Coins (Space or ↑)"
           >
             <ArrowUp className="w-3.5 h-3.5" />
@@ -213,7 +206,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
           <button
             type="button"
             onClick={onMoveRight}
-            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-white flex items-center gap-1 transition-all whitespace-nowrap shrink-0 border border-white/10"
+            className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-white flex items-center gap-1 transition-all whitespace-nowrap shrink-0 border border-white/10"
             title="Switch to Right Lane (Keyboard D or →)"
           >
             <span>Right (D)</span>
@@ -221,12 +214,29 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
           </button>
         </div>
 
-        {/* Current Lane & Auto-Pilot / Sound Controls */}
-        <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
-          <span className="text-[11px] text-slate-300 font-medium px-1.5 whitespace-nowrap">
-            {LANE_NAMES[gameStats.currentLane]}
-          </span>
+        {/* Direct 3-Lane Switcher Pills (Lane 1 | Lane 2 | Lane 3) */}
+        <div className="flex items-center gap-1 bg-[#090B1F] p-1 rounded-xl border border-white/10">
+          {LANE_OPTIONS.map((opt) => {
+            const active = gameStats.currentLane === opt.lane;
+            return (
+              <button
+                key={opt.lane}
+                type="button"
+                onClick={() => onSelectLane(opt.lane)}
+                className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap ${
+                  active
+                    ? 'bg-[#FACC15] text-[#0B0C22]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {opt.shortLabel}
+              </button>
+            );
+          })}
+        </div>
 
+        {/* Auto-Pilot / Sound / Zen Controls */}
+        <div className="flex items-center gap-1.5 pl-1 border-l border-white/10">
           <button
             type="button"
             onClick={onToggleAutoPlay}
@@ -240,12 +250,12 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             {isAutoPlay ? (
               <>
                 <Bot className="w-3.5 h-3.5" />
-                <span>AI Auto-Pilot ON</span>
+                <span>AI Pilot ON</span>
               </>
             ) : (
               <>
                 <Gamepad2 className="w-3.5 h-3.5" />
-                <span>Manual Control</span>
+                <span>Manual</span>
               </>
             )}
           </button>
@@ -271,7 +281,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             {isCollapsed ? (
               <>
                 <ChevronUp className="w-3.5 h-3.5 text-[#FF85B8]" />
-                <span>Expand Dock</span>
+                <span>Expand</span>
               </>
             ) : (
               <>
@@ -285,15 +295,16 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
 
       {!isCollapsed && (
         <div className="w-full bg-[#11132E]/95 border border-white/15 rounded-2xl shadow-2xl px-5 py-3 space-y-2.5">
-          {/* Row 1: Live GPX Telemetry + Interactive Elevation & Pace Scrubber */}
+          {/* Row 1: Live GPX Telemetry + Interactive Course Progress Scrubber */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
             <div className="lg:col-span-4 flex items-center justify-between lg:justify-start gap-4 border-b lg:border-b-0 lg:border-r border-white/10 pb-2 lg:pb-0 lg:pr-4">
               <div>
-                <div className="text-[11px] text-slate-400">Distance</div>
+                <div className="text-[11px] text-slate-400">Course Progress</div>
                 <div className="text-base font-bold font-mono-tabular text-white">
                   {currentPoint.distKm.toFixed(2)}
                   <span className="text-xs font-normal text-slate-400 ml-1">
-                    / {course.totalDistanceKm.toFixed(2)} km
+                    / {course.totalDistanceKm.toFixed(2)} km (
+                    {Math.round(progressRatio * 100)}%)
                   </span>
                 </div>
               </div>
@@ -317,32 +328,27 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
               </div>
 
               <div>
-                <div className="text-[11px] text-slate-400">
-                  Elevation · Grade
-                </div>
-                <div className="text-sm font-semibold font-mono-tabular text-[#FF85B8]">
-                  {currentPoint.ele.toFixed(0)}m
-                  <span className="text-xs text-slate-300 ml-1">
-                    ({currentPoint.gradePercent >= 0 ? '+' : ''}
-                    {currentPoint.gradePercent.toFixed(1)}%)
-                  </span>
+                <div className="text-[11px] text-slate-400">Best Saved</div>
+                <div className="text-sm font-bold font-mono-tabular text-[#FACC15]">
+                  {courseRecord
+                    ? `${courseRecord.bestScore.toLocaleString()} PTS`
+                    : 'No Record'}
                 </div>
               </div>
             </div>
 
-            {/* Interactive SVG Elevation & Pace Timeline Scrubber */}
+            {/* Interactive SVG Course Timeline Scrubber (Flat 0m Elevation · Non-Overlapping Track) */}
             <div className="lg:col-span-8 flex flex-col gap-1">
               <div className="flex items-center justify-between text-[11px] text-slate-300">
                 <span>
-                  Elevation Profile ({course.minElevationM}m –{' '}
-                  {course.maxElevationM}m) · Elapsed{' '}
+                  Flat 3-Lane Track (0m Elevation · Non-Overlapping) · Elapsed{' '}
                   <strong className="font-mono-tabular text-white">
                     {formatDuration(currentPoint.elapsedSeconds)}
                   </strong>
                 </span>
-                <span className="text-[#FACC15] font-medium truncate max-w-[290px]">
+                <span className="text-[#FACC15] font-medium truncate max-w-[320px]">
                   {gameStats.lastEventLabel ||
-                    'Use A/D or Arrow keys to switch 3 lanes & Space to jump!'}
+                    'Reach 100% Finish Line to save your Coin Score & return to Dashboard!'}
                 </span>
               </div>
 
@@ -368,11 +374,11 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                   }}
                 >
                   <defs>
-                    <linearGradient id="eleFillGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="paceFillGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop
                         offset="0%"
                         stopColor={theme.treeFoliagePrimaryHex}
-                        stopOpacity="0.5"
+                        stopOpacity="0.48"
                       />
                       <stop
                         offset="100%"
@@ -382,20 +388,12 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     </linearGradient>
                   </defs>
 
-                  <path d={eleAreaPath} fill="url(#eleFillGrad)" />
-                  <path
-                    d={eleLinePath}
-                    fill="none"
-                    stroke={theme.treeFoliagePrimaryHex}
-                    strokeWidth="2"
-                  />
+                  <path d={paceAreaPath} fill="url(#paceFillGrad)" />
                   <path
                     d={paceLinePath}
                     fill="none"
-                    stroke={theme.groundPrimaryHex}
-                    strokeWidth="1.2"
-                    strokeDasharray="3 3"
-                    opacity="0.75"
+                    stroke={theme.treeFoliagePrimaryHex}
+                    strokeWidth="2"
                   />
 
                   {course.landmarks.map((lm) => {
@@ -415,6 +413,17 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     );
                   })}
 
+                  {/* Finish Line Marker at 100% */}
+                  <line
+                    x1={676}
+                    y1={0}
+                    x2={676}
+                    y2={52}
+                    stroke="#FACC15"
+                    strokeWidth="3"
+                  />
+
+                  {/* Current Runner Playhead */}
                   <line
                     x1={progressRatio * 680}
                     y1={0}
@@ -428,7 +437,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Unified Controls */}
+          {/* Row 2: Unified Controls (Locked 2.0x Speed + Finish & Save Score Button) */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-white/10">
             <div className="flex items-center gap-2">
               <button
@@ -461,22 +470,25 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
 
-              <div className="flex items-center bg-[#090B1F] p-1 rounded-xl border border-white/10">
-                {SPEED_OPTIONS.map((spd) => (
-                  <button
-                    key={spd}
-                    type="button"
-                    onClick={() => onChangeSpeed(spd)}
-                    className={`px-2 py-1 rounded-lg text-xs font-mono-tabular font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      playbackSpeed === spd
-                        ? 'bg-white text-[#0B0C22]'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {spd}x
-                  </button>
-                ))}
+              {/* Locked 2.0x Speed Indicator */}
+              <div
+                className="px-3 py-1.5 rounded-xl bg-[#090B1F] border border-[#76FFB2]/40 text-xs font-mono-tabular font-bold text-[#76FFB2] flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                title="Playback speed is locked at 2.0x"
+              >
+                <Gauge className="w-3.5 h-3.5" />
+                <span>2.0x Speed Locked</span>
               </div>
+
+              {/* Finish Run & Save Score to Dashboard */}
+              <button
+                type="button"
+                onClick={onFinishRunAndSave}
+                className="px-3 py-1.5 rounded-xl bg-[#FACC15] hover:bg-[#fde047] text-[#0B0C22] font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap shrink-0"
+                title="Complete run now, save current Coin Score, and return to Dashboard"
+              >
+                <Flag className="w-3.5 h-3.5 fill-current" />
+                <span>Finish & Save Score</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-1.5 bg-[#090B1F] p-1 rounded-xl border border-white/10">

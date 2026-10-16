@@ -1,23 +1,34 @@
+import * as THREE from 'three';
 import {
   ArtworkThemeConfig,
   ArtworkThemeId,
   BuildingArchStyle,
   CardAuraPalette,
   CourseCategory,
+  CourseCoinPlacement,
+  CourseEnergyGel,
+  CourseTurboPad,
   EnvironmentBiome,
   GpxCourseData,
   GpxKmSplit,
   GpxTrackPoint,
+  PACE_BUCKETS,
+  PaceBucketId,
   SurroundingLandmark,
   WaterOrParkPolygon,
 } from '../types/gpx';
+
+export const ROAD_HALF = 4.2; // Total 3-lane road width = 8.4 units
+export const COIN_SPACING = 5;
+export const GEL_EVERY_M = 5000;
 
 export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
   meadow: {
     id: 'meadow',
     nameKo: 'Pink Fluffy Meadow',
     nameEn: 'Pink Fluffy Meadow',
-    inspirationLabel: 'Neon mint hills and giant pink wool trees under a starry sky',
+    inspirationLabel:
+      'Neon mint meadow and giant pink wool trees under a starry sky',
     skyTopHex: '#07081C',
     skyHorizonHex: '#25265E',
     fogHex: '#1D1E4F',
@@ -37,7 +48,8 @@ export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
     id: 'cloud',
     nameKo: 'Cloud Stride Autumn',
     nameEn: 'Cloud Stride Autumn',
-    inspirationLabel: 'Dreamy cobalt sky with soft clouds and autumn foliage',
+    inspirationLabel:
+      'Dreamy cobalt sky with soft clouds and autumn foliage',
     skyTopHex: '#4252D6',
     skyHorizonHex: '#7382F0',
     fogHex: '#5E6CE6',
@@ -57,7 +69,8 @@ export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
     id: 'night_garden',
     nameKo: 'Luminous Night Garden',
     nameEn: 'Luminous Night Garden',
-    inspirationLabel: 'Bioluminescent pastel botanical garden under a crimson moon',
+    inspirationLabel:
+      'Bioluminescent pastel botanical garden under a crimson moon',
     skyTopHex: '#120817',
     skyHorizonHex: '#2A1233',
     fogHex: '#1E0D26',
@@ -77,7 +90,8 @@ export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
     id: 'riverside',
     nameKo: 'Riverside Felt Stroll',
     nameEn: 'Riverside Felt Stroll',
-    inspirationLabel: 'Waterfront felt trail with a floating pink-finned companion fish',
+    inspirationLabel:
+      'Waterfront felt trail with a floating pink-finned companion fish',
     skyTopHex: '#5257C9',
     skyHorizonHex: '#8488E8',
     fogHex: '#686CD9',
@@ -96,42 +110,36 @@ export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
 };
 
 export const CARD_AURA_PRESETS: CardAuraPalette[] = [
-  // 1. Periwinkle Blue with soft sky-white core (like "Exhale" top-left in reference)
   {
     outerBg: '#5B8EF4',
     innerGlow: '#8FB6FF',
     rimHighlight: '#BFD7FF',
     tubeTint: '#E8F1FF',
   },
-  // 2. Periwinkle-Violet with warm rose-pink radial core (like "Flow" top-right in reference)
   {
     outerBg: '#7A8EF5',
     innerGlow: '#E68AB8',
     rimHighlight: '#C4CEFF',
     tubeTint: '#F9E8F2',
   },
-  // 3. Soft Lavender-Blue with cool aqua-mint core (like "Between" middle-left in reference)
   {
     outerBg: '#9BA8FA',
     innerGlow: '#7BC5AE',
     rimHighlight: '#D4DAFF',
     tubeTint: '#EBF8F5',
   },
-  // 4. Seafoam Sage Mint with luminous pearl core (like "Presence" middle-right in reference)
   {
     outerBg: '#9CD2CB',
     innerGlow: '#6FA9A2',
     rimHighlight: '#D8F3EF',
     tubeTint: '#F2FCFA',
   },
-  // 5. Rose-Lilac Orchid with warm blush core (like "Ignite" bottom-left in reference)
   {
     outerBg: '#CFA1CB',
     innerGlow: '#BA7FA8',
     rimHighlight: '#F3D6F0',
     tubeTint: '#FDF0FA',
   },
-  // 6. Sky-Cyan border with vibrant magenta-violet core (like "Echo" bottom-right in reference)
   {
     outerBg: '#8BB8F8',
     innerGlow: '#D47EB8',
@@ -140,13 +148,38 @@ export const CARD_AURA_PRESETS: CardAuraPalette[] = [
   },
 ];
 
+/**
+ * FNV-1a 32-bit hash for deterministic PRNG seeding per course ID
+ */
+export function fnv1a(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Mulberry32 deterministic PRNG
+ */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function haversineDistanceKm(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -160,7 +193,7 @@ export function haversineDistanceKm(
 }
 
 export function formatPace(paceMinPerKm: number): string {
-  if (!Number.isFinite(paceMinPerKm) || paceMinPerKm <= 0) return `5'30"`;
+  if (!Number.isFinite(paceMinPerKm) || paceMinPerKm <= 0) return `5'15"`;
   const clamped = Math.max(2.5, Math.min(15, paceMinPerKm));
   const mins = Math.floor(clamped);
   const secs = Math.round((clamped - mins) * 60);
@@ -183,29 +216,135 @@ export function formatDuration(seconds: number): string {
 interface RawPointInput {
   lat: number;
   lng: number;
-  ele: number;
+  ele?: number;
   timeMs?: number;
+  paceMinPerKm?: number;
   biome?: EnvironmentBiome;
 }
 
 /**
- * Removes micro-jitter or duplicate GPS points that could cause sharp spline kinks.
+ * Step 2: projectLocal — equirectangular projection around the first point (lat0, lng0).
+ * x = east (m), y = north (m). The world uses north = -z (worldX = x, worldZ = -y).
  */
-function sanitizeRawPoints(inputPoints: RawPointInput[]): RawPointInput[] {
-  if (inputPoints.length <= 2) return inputPoints;
-  const filtered: RawPointInput[] = [inputPoints[0]];
-  for (let i = 1; i < inputPoints.length; i++) {
-    const prev = filtered[filtered.length - 1];
-    const curr = inputPoints[i];
-    const distMeters =
-      haversineDistanceKm(prev.lat, prev.lng, curr.lat, curr.lng) * 1000;
-    if (distMeters >= 4.0 || i === inputPoints.length - 1) {
-      filtered.push(curr);
-    }
-  }
-  return filtered.length >= 2 ? filtered : inputPoints;
+export function projectLocal(
+  lat: number,
+  lng: number,
+  lat0: number,
+  lng0: number
+): { x: number; y: number; worldX: number; worldZ: number } {
+  const R = 6371000;
+  const cosLat0 = Math.cos((lat0 * Math.PI) / 180);
+  const x = ((lng - lng0) * Math.PI * R * cosLat0) / 180;
+  const y = ((lat - lat0) * Math.PI * R) / 180;
+  return {
+    x,
+    y,
+    worldX: x,
+    worldZ: -y, // north = -z
+  };
 }
 
+/**
+ * Step 3: simplifyRdp — Ramer-Douglas-Peucker simplification with epsilon = 3 m.
+ */
+interface LocalProjectedPt {
+  lat: number;
+  lng: number;
+  x: number;
+  y: number;
+  distM: number;
+  paceMinPerKm: number;
+  elapsedSeconds: number;
+  biome: EnvironmentBiome;
+}
+
+function perpendicularDistance2D(
+  pt: { x: number; y: number },
+  lineStart: { x: number; y: number },
+  lineEnd: { x: number; y: number }
+): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const magSq = dx * dx + dy * dy;
+  if (magSq < 1e-9) {
+    return Math.hypot(pt.x - lineStart.x, pt.y - lineStart.y);
+  }
+  const u = Math.max(
+    0,
+    Math.min(1, ((pt.x - lineStart.x) * dx + (pt.y - lineStart.y) * dy) / magSq)
+  );
+  const projX = lineStart.x + u * dx;
+  const projY = lineStart.y + u * dy;
+  return Math.hypot(pt.x - projX, pt.y - projY);
+}
+
+export function simplifyRdp(
+  pts: LocalProjectedPt[],
+  epsilonMeters = 3.0
+): LocalProjectedPt[] {
+  if (pts.length <= 2) return pts;
+
+  let maxDist = 0;
+  let maxIdx = 0;
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = perpendicularDistance2D(pts[i], first, last);
+    if (d > maxDist) {
+      maxDist = d;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > epsilonMeters) {
+    const left = simplifyRdp(pts.slice(0, maxIdx + 1), epsilonMeters);
+    const right = simplifyRdp(pts.slice(maxIdx), epsilonMeters);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
+/**
+ * Guarantees 100% non-overlapping 2D segments before building the centripetal spline.
+ */
+function unfoldNonOverlappingLocalPts(pts: LocalProjectedPt[]): void {
+  const minClearanceM = 45.0;
+  const n = pts.length;
+  if (n < 4) return;
+
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 5; i < n; i++) {
+      for (let j = 0; j < i - 4; j++) {
+        const dx = pts[i].x - pts[j].x;
+        const dy = pts[i].y - pts[j].y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < minClearanceM) {
+          const push = minClearanceM - dist + 5.0;
+          let nx = dx;
+          let ny = dy;
+          const len = Math.hypot(nx, ny);
+          if (len > 0.001) {
+            nx /= len;
+            ny /= len;
+          } else {
+            nx = 1;
+            ny = 0;
+          }
+          for (let k = i; k < n; k++) {
+            const falloff = Math.exp(-(k - i) * 0.12);
+            pts[k].x += nx * push * falloff;
+            pts[k].y += ny * push * falloff;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Full 9-step Route Processing & Real Pace Course Builder
+ */
 function buildCourseFromRawPoints(params: {
   id: string;
   title: string;
@@ -219,181 +358,402 @@ function buildCourseFromRawPoints(params: {
   landmarks: SurroundingLandmark[];
   mapPolygons: WaterOrParkPolygon[];
 }): GpxCourseData {
-  const rawPoints = sanitizeRawPoints(params.rawPoints);
-  const count = rawPoints.length;
+  const inputPts = params.rawPoints;
+  if (inputPts.length < 2) {
+    throw new Error('Route is too short (needs at least 200 m).');
+  }
 
-  // Center coordinates for 3D projection
-  const avgLat = rawPoints.reduce((acc, p) => acc + p.lat, 0) / count;
-  const avgLng = rawPoints.reduce((acc, p) => acc + p.lng, 0) / count;
-  const minEle = Math.min(...rawPoints.map((p) => p.ele));
-  const maxEle = Math.max(...rawPoints.map((p) => p.ele));
+  const lat0 = inputPts[0].lat;
+  const lng0 = inputPts[0].lng;
+  const R = 6371000;
+  const cosLat0 = Math.cos((lat0 * Math.PI) / 180);
 
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
+  // Build local projected points & real distance/pace profile
+  const localPts: LocalProjectedPt[] = [];
+  let cumulativeRealM = 0;
+  let cumulativeSec = 0;
 
-  // Scale factor so a ~5km route spans ~440 scene units for lush 3D traversal
-  const rawSpanMeters = Math.max(
-    400,
-    ...rawPoints.map((p) => {
-      const dx = (p.lng - avgLng) * metersPerDegLng;
-      const dz = (p.lat - avgLat) * metersPerDegLat;
-      return Math.hypot(dx, dz);
-    })
-  );
-  const worldScale = 230 / rawSpanMeters;
+  for (let i = 0; i < inputPts.length; i++) {
+    const curr = inputPts[i];
+    const prev = i > 0 ? inputPts[i - 1] : curr;
+    const proj = projectLocal(curr.lat, curr.lng, lat0, lng0);
 
-  const points: GpxTrackPoint[] = [];
-  let cumulativeDistKm = 0;
-  let cumulativeSeconds = 0;
-  let totalEleGain = 0;
+    let segM = 0;
+    if (i > 0) {
+      const prevProj = localPts[i - 1];
+      segM = Math.hypot(proj.x - prevProj.x, proj.y - prevProj.y);
+    }
+    cumulativeRealM += segM;
 
-  for (let i = 0; i < count; i++) {
-    const curr = rawPoints[i];
-    const prev = i > 0 ? rawPoints[i - 1] : curr;
-
-    const segDistKm =
-      i > 0 ? haversineDistanceKm(prev.lat, prev.lng, curr.lat, curr.lng) : 0;
-    cumulativeDistKm += segDistKm;
-
-    const eleDiff = curr.ele - prev.ele;
-    if (eleDiff > 0) totalEleGain += eleDiff;
-
-    const segDistMeters = segDistKm * 1000;
-    const gradePercent =
-      segDistMeters > 1
-        ? Math.max(-18, Math.min(18, (eleDiff / segDistMeters) * 100))
-        : 0;
-
-    let segSeconds = 0;
-    let paceMinPerKm = 5.2;
+    let paceMinPerKm = curr.paceMinPerKm ?? 5.15;
+    let segSec = 0;
 
     if (i > 0) {
+      const segKm = segM / 1000;
       if (curr.timeMs && prev.timeMs && curr.timeMs > prev.timeMs) {
-        segSeconds = (curr.timeMs - prev.timeMs) / 1000;
-        if (segDistKm > 0.0005) {
-          paceMinPerKm = Math.max(
-            3.2,
-            Math.min(10.5, segSeconds / 60 / segDistKm)
-          );
+        segSec = (curr.timeMs - prev.timeMs) / 1000;
+        if (segKm > 0.0002) {
+          paceMinPerKm = Math.max(3.2, Math.min(9.8, segSec / 60 / segKm));
         }
+      } else if (curr.paceMinPerKm !== undefined) {
+        paceMinPerKm = curr.paceMinPerKm;
+        segSec = segKm * paceMinPerKm * 60;
       } else {
-        // Synthesize realistic runner pace affected by grade & rhythm
-        const gradeFactor = gradePercent * 0.11;
-        const waveFactor = Math.sin(i * 0.25) * 0.28;
-        paceMinPerKm = Math.max(
-          3.6,
-          Math.min(8.2, 5.15 + gradeFactor + waveFactor)
-        );
-        segSeconds = segDistKm * paceMinPerKm * 60;
+        // Rich, realistic pace variation across the route (Fast, Steady, Slow, Very slow sections)
+        const wave =
+          Math.sin(i * 0.19 + fnv1a(params.id) * 0.001) * 0.85 +
+          Math.cos(i * 0.07) * 0.45;
+        paceMinPerKm = Math.max(4.15, Math.min(6.75, 5.25 + wave));
+        segSec = segKm * paceMinPerKm * 60;
       }
     }
 
-    cumulativeSeconds += segSeconds;
-    const speedKmh = paceMinPerKm > 0 ? 60 / paceMinPerKm : 11.5;
+    cumulativeSec += segSec;
 
-    const dxMeters = (curr.lng - avgLng) * metersPerDegLng;
-    const dzMeters = -(curr.lat - avgLat) * metersPerDegLat; // North = -Z in Three.js
-    const worldX = dxMeters * worldScale;
-    const worldZ = dzMeters * worldScale;
-    const worldY = (curr.ele - minEle) * 0.28;
-
-    points.push({
-      index: i,
+    localPts.push({
       lat: curr.lat,
       lng: curr.lng,
-      ele: Number(curr.ele.toFixed(1)),
-      timeIso: new Date(
-        Date.UTC(2026, 9, 15, 11, 0, 0) + cumulativeSeconds * 1000
-      ).toISOString(),
-      elapsedSeconds: Math.round(cumulativeSeconds),
-      distKm: Number(cumulativeDistKm.toFixed(3)),
-      paceMinPerKm: Number(paceMinPerKm.toFixed(2)),
-      speedKmh: Number(speedKmh.toFixed(1)),
-      gradePercent: Number(gradePercent.toFixed(1)),
+      x: proj.x,
+      y: proj.y,
+      distM: cumulativeRealM,
+      paceMinPerKm,
+      elapsedSeconds: cumulativeSec,
       biome: curr.biome || 'park',
-      worldX,
-      worldY,
-      worldZ,
-      isOverpass: false,
     });
   }
 
-  // Automatic 3D De-Overlapping & Skywalk Grade-Separation Pass:
-  // Prevents any overlapping / out-and-back / self-crossing segments from colliding in 3D space.
-  const minTrackSeparation = 11.5;
-  const lateralOffsetsX = new Float32Array(points.length);
-  const lateralOffsetsZ = new Float32Array(points.length);
-  const verticalOverpassY = new Float32Array(points.length);
+  // Step 1: Reject routes shorter than 200 m
+  if (cumulativeRealM < 200) {
+    throw new Error('Route is too short (needs at least 200 m).');
+  }
 
-  for (let i = 10; i < points.length; i++) {
-    const pi = points[i];
-    const prevI = points[Math.max(0, i - 1)];
-    let dirX = pi.worldX - prevI.worldX;
-    let dirZ = pi.worldZ - prevI.worldZ;
-    const dirLen = Math.hypot(dirX, dirZ) || 1;
-    dirX /= dirLen;
-    dirZ /= dirLen;
-    const rightX = -dirZ;
-    const rightZ = dirX;
+  // Step 3: simplifyRdp with epsilon = 3 m
+  let simplifiedPts = simplifyRdp(localPts, 3.0);
+  if (simplifiedPts.length < 4) {
+    simplifiedPts = localPts;
+  }
+  unfoldNonOverlappingLocalPts(simplifiedPts);
 
-    for (let j = 0; j < i - 10; j++) {
-      const isLoopClosure = i > points.length - 8 && j < 8;
-      const dx = pi.worldX - points[j].worldX;
-      const dz = pi.worldZ - points[j].worldZ;
-      const dist = Math.hypot(dx, dz);
+  // Build centripetal CatmullRomCurve3 in world coordinates (worldX = x, worldY = 0, worldZ = -y)
+  const rdpWorldVectors = simplifiedPts.map(
+    (p) => new THREE.Vector3(p.x, 0, -p.y)
+  );
+  const rawCurve = new THREE.CatmullRomCurve3(
+    rdpWorldVectors,
+    false,
+    'centripetal',
+    0.5
+  );
+  rawCurve.arcLengthDivisions = 2400;
 
-      if (dist < minTrackSeparation && !isLoopClosure) {
-        const overlapRatio = 1 - dist / minTrackSeparation;
-        lateralOffsetsX[i] += rightX * overlapRatio * 8.5;
-        lateralOffsetsZ[i] += rightZ * overlapRatio * 8.5;
-        verticalOverpassY[i] = Math.max(
-          verticalOverpassY[i],
-          overlapRatio * 3.8
-        );
-        pi.isOverpass = true;
+  // Step 3 continued: getSpacedPoints(N - 1) with N = 1200 evenly spaced samples
+  const N = 1200;
+  const spacedPts = rawCurve.getSpacedPoints(N - 1);
+
+  // Step 4: Game length = clamp(km * 400 + 400, 1400, 3200) units. Uniformly scaled to that length.
+  const totalDistanceKm = cumulativeRealM / 1000;
+  const gameLength = Math.max(
+    1400,
+    Math.min(3200, totalDistanceKm * 400 + 400)
+  );
+
+  let rawPolyLen = 0;
+  for (let i = 1; i < N; i++) {
+    rawPolyLen += spacedPts[i].distanceTo(spacedPts[i - 1]);
+  }
+  const uniformScale = rawPolyLen > 1e-6 ? gameLength / rawPolyLen : 1;
+  for (let i = 0; i < N; i++) {
+    spacedPts[i].multiplyScalar(uniformScale);
+    spacedPts[i].y = 0;
+  }
+
+  const ds = gameLength / (N - 1);
+
+  // Step 5: Interpolate each sample's pace by the fraction of real distance along the route
+  const samplePaces: number[] = new Array(N);
+  const sampleElapsed: number[] = new Array(N);
+  const sampleBiomes: EnvironmentBiome[] = new Array(N);
+
+  let rawCursor = 0;
+  for (let i = 0; i < N; i++) {
+    const frac = i / (N - 1);
+    const targetM = frac * cumulativeRealM;
+    while (
+      rawCursor < localPts.length - 2 &&
+      localPts[rawCursor + 1].distM < targetM
+    ) {
+      rawCursor++;
+    }
+    const pA = localPts[rawCursor];
+    const pB = localPts[Math.min(localPts.length - 1, rawCursor + 1)];
+    const segSpan = Math.max(1e-6, pB.distM - pA.distM);
+    const alpha = Math.max(0, Math.min(1, (targetM - pA.distM) / segSpan));
+
+    samplePaces[i] = pA.paceMinPerKm + (pB.paceMinPerKm - pA.paceMinPerKm) * alpha;
+    sampleElapsed[i] =
+      pA.elapsedSeconds + (pB.elapsedSeconds - pA.elapsedSeconds) * alpha;
+    sampleBiomes[i] = alpha < 0.5 ? pA.biome : pB.biome;
+  }
+
+  // Compute min and max pace across the route
+  let minPace = Infinity;
+  let maxPace = -Infinity;
+  for (let i = 0; i < N; i++) {
+    if (samplePaces[i] < minPace) minPace = samplePaces[i];
+    if (samplePaces[i] > maxPace) maxPace = samplePaces[i];
+  }
+
+  // Assign raw bucket per sample:
+  // Lower paceMinPerKm (faster running) -> Bucket 0 (Fast)
+  // Higher paceMinPerKm (slower running) -> Bucket 3 (Very slow)
+  // If max - min < 1e-6, every point is bucket 1 (Steady).
+  const rawBuckets: PaceBucketId[] = new Array(N);
+  const paceSpan = maxPace - minPace;
+  if (paceSpan < 1e-6) {
+    for (let i = 0; i < N; i++) rawBuckets[i] = 1;
+  } else {
+    for (let i = 0; i < N; i++) {
+      const u = (samplePaces[i] - minPace) / paceSpan;
+      if (u < 0.25) rawBuckets[i] = 0;
+      else if (u < 0.5) rawBuckets[i] = 1;
+      else if (u < 0.75) rawBuckets[i] = 2;
+      else rawBuckets[i] = 3;
+    }
+  }
+
+  // Step 5 continued: Smooth bucket with a ±8-sample majority filter to avoid thin flicker stripes
+  const smoothedBuckets: PaceBucketId[] = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const counts = [0, 0, 0, 0];
+    const startJ = Math.max(0, i - 8);
+    const endJ = Math.min(N - 1, i + 8);
+    for (let j = startJ; j <= endJ; j++) {
+      counts[rawBuckets[j]]++;
+    }
+    let bestBucket: PaceBucketId = rawBuckets[i];
+    let bestCount = counts[bestBucket];
+    for (let b = 0 as PaceBucketId; b <= 3; b = (b + 1) as PaceBucketId) {
+      if (counts[b] > bestCount) {
+        bestCount = counts[b];
+        bestBucket = b;
       }
     }
+    smoothedBuckets[i] = bestBucket;
   }
 
-  for (let pass = 0; pass < 3; pass++) {
-    for (let i = 2; i < points.length - 2; i++) {
-      lateralOffsetsX[i] =
-        (lateralOffsetsX[i - 2] +
-          lateralOffsetsX[i - 1] +
-          lateralOffsetsX[i] +
-          lateralOffsetsX[i + 1] +
-          lateralOffsetsX[i + 2]) /
-        5;
-      lateralOffsetsZ[i] =
-        (lateralOffsetsZ[i - 2] +
-          lateralOffsetsZ[i - 1] +
-          lateralOffsetsZ[i] +
-          lateralOffsetsZ[i + 1] +
-          lateralOffsetsZ[i + 2]) /
-        5;
-      verticalOverpassY[i] =
-        (verticalOverpassY[i - 2] +
-          verticalOverpassY[i - 1] +
-          verticalOverpassY[i] +
-          verticalOverpassY[i + 1] +
-          verticalOverpassY[i + 2]) /
-        5;
-    }
+  // Step 6: Signed curvature k = cross(t_i, t_{i+1}) / ds, averaged over ±5 samples. Positive k = right turn.
+  const tangentsX: number[] = new Array(N);
+  const tangentsZ: number[] = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const p0 = spacedPts[Math.max(0, i - 1)];
+    const p1 = spacedPts[Math.min(N - 1, i + 1)];
+    const tx = p1.x - p0.x;
+    const tz = p1.z - p0.z;
+    const len = Math.hypot(tx, tz) || 1;
+    tangentsX[i] = tx / len;
+    tangentsZ[i] = tz / len;
   }
 
-  for (let i = 0; i < points.length; i++) {
-    points[i].worldX += lateralOffsetsX[i];
-    points[i].worldZ += lateralOffsetsZ[i];
-    points[i].worldY += verticalOverpassY[i];
-    if (
-      Math.abs(lateralOffsetsX[i]) > 0.01 ||
-      Math.abs(lateralOffsetsZ[i]) > 0.01
-    ) {
-      points[i].lng =
-        avgLng + points[i].worldX / worldScale / metersPerDegLng;
-      points[i].lat =
-        avgLat - points[i].worldZ / worldScale / metersPerDegLat;
+  const rawCurvature: number[] = new Array(N).fill(0);
+  for (let i = 0; i < N - 1; i++) {
+    // North = -z, East = +x -> right turn from (0,-1) to (1,0) has tx_i*tz_{i+1} - tz_i*tx_{i+1} = +1
+    const cross =
+      tangentsX[i] * tangentsZ[i + 1] - tangentsZ[i] * tangentsX[i + 1];
+    rawCurvature[i] = cross / ds;
+  }
+  rawCurvature[N - 1] = rawCurvature[N - 2];
+
+  const smoothedCurvature: number[] = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const sJ = Math.max(0, i - 5);
+    const eJ = Math.min(N - 1, i + 5);
+    let sumK = 0;
+    for (let j = sJ; j <= eJ; j++) {
+      sumK += rawCurvature[j];
     }
+    smoothedCurvature[i] = sumK / (eJ - sJ + 1);
+  }
+
+  // Build the N = 1200 GpxTrackPoint array
+  const points: GpxTrackPoint[] = new Array(N);
+  const bucketCounts: Record<PaceBucketId, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+
+  for (let i = 0; i < N; i++) {
+    const frac = i / (N - 1);
+    const s = frac * gameLength;
+    const distKm = frac * totalDistanceKm;
+    const bucket = smoothedBuckets[i];
+    bucketCounts[bucket]++;
+    const bucketSpec = PACE_BUCKETS[bucket];
+
+    const worldX = spacedPts[i].x;
+    const worldZ = spacedPts[i].z;
+    // Inverse equirectangular back to lat/lng for minimap
+    const eastM = worldX / uniformScale;
+    const northM = -worldZ / uniformScale;
+    const lat = lat0 + (northM / R) * (180 / Math.PI);
+    const lng = lng0 + (eastM / (R * cosLat0)) * (180 / Math.PI);
+
+    const pace = samplePaces[i];
+    const speedKmh = pace > 0 ? 60 / pace : 11.5;
+
+    points[i] = {
+      index: i,
+      lat,
+      lng,
+      ele: 0,
+      timeIso: new Date(
+        Date.UTC(2026, 9, 15, 11, 0, 0) + sampleElapsed[i] * 1000
+      ).toISOString(),
+      elapsedSeconds: Math.round(sampleElapsed[i]),
+      distKm: Number(distKm.toFixed(3)),
+      paceMinPerKm: Number(pace.toFixed(2)),
+      speedKmh: Number(speedKmh.toFixed(1)),
+      gradePercent: 0,
+      biome: sampleBiomes[i],
+      worldX,
+      worldY: 0,
+      worldZ,
+      s,
+      paceBucket: bucket,
+      bucketColor: bucketSpec.color,
+      speedCap: bucketSpec.speedCap,
+      curvature: smoothedCurvature[i],
+      isOverpass: false,
+    };
+  }
+
+  // Step 7: Turbo pads — PRNG mulberry32(fnv1a(run.id))
+  // Starting at s = 120 and ending 120 units before the finish, candidate every 70–130 units.
+  // Slow/very-slow buckets skipped 75% of the time. Lateral offset within ±(ROAD_HALF - 1.6 - 0.3).
+  // After each pad, skip 90 more units.
+  const padRng = mulberry32(fnv1a(params.id));
+  const turboPads: CourseTurboPad[] = [];
+  const padMaxLat = ROAD_HALF - 1.6 - 0.3; // 2.3 units
+  let sPad = 120;
+  let padId = 0;
+
+  while (sPad <= gameLength - 120) {
+    sPad += 70 + padRng() * 60;
+    if (sPad > gameLength - 120) break;
+
+    const sampleIdx = Math.min(
+      N - 1,
+      Math.max(0, Math.round((sPad / gameLength) * (N - 1)))
+    );
+    const bucket = smoothedBuckets[sampleIdx];
+
+    if ((bucket === 2 || bucket === 3) && padRng() < 0.75) {
+      continue;
+    }
+
+    const lateral = (padRng() * 2 - 1) * padMaxLat;
+    turboPads.push({
+      id: padId++,
+      s: sPad,
+      t: sPad / gameLength,
+      lateral,
+      bucket,
+    });
+
+    sPad += 90;
+  }
+
+  // Step 9 (computed before Step 8 filtering so coins within ±15 units of a gel can be removed):
+  // Energy gels — one at every 5000 real metres (GEL_EVERY_M), except within 300 m of the finish.
+  // Gels sit at lateral 0.
+  const energyGels: CourseEnergyGel[] = [];
+  let gelId = 0;
+  for (
+    let realM = GEL_EVERY_M;
+    realM <= cumulativeRealM - 300;
+    realM += GEL_EVERY_M
+  ) {
+    const tGel = realM / cumulativeRealM;
+    const sGel = tGel * gameLength;
+    energyGels.push({
+      id: gelId++,
+      realMeters: realM,
+      s: sGel,
+      t: tGel,
+      lateral: 0,
+    });
+  }
+
+  // Step 8: Coins — PRNG mulberry32(fnv1a(run.id) ^ 0x9e3779b9), separate so coins never move the pads.
+  // Rows of 5–8, spaced COIN_SPACING = 5, in one of three shapes:
+  // straight (40%), diagonal across the road (35%) or arc (25%), within lateral ±(ROAD_HALF - 1.1).
+  // A coin is skipped if it would sit on a pad (|Δs| < 4 and |Δlat| < 2.4).
+  // Gap between rows is 35–90 units. Coins within ±15 units of a gel are removed.
+  const coinRng = mulberry32((fnv1a(params.id) ^ 0x9e3779b9) >>> 0);
+  const coins: CourseCoinPlacement[] = [];
+  const coinMaxLat = ROAD_HALF - 1.1; // 3.1 units
+  let sRowStart = 60 + coinRng() * 35;
+  let coinId = 0;
+  let rowId = 0;
+
+  while (sRowStart < gameLength - 70) {
+    const rowCount = 5 + Math.floor(coinRng() * 4); // 5..8 coins
+    const shapeRoll = coinRng();
+    let shape: 'straight' | 'diagonal' | 'arc';
+    if (shapeRoll < 0.4) {
+      shape = 'straight';
+    } else if (shapeRoll < 0.75) {
+      shape = 'diagonal';
+    } else {
+      shape = 'arc';
+    }
+
+    const latA = (coinRng() * 2 - 1) * coinMaxLat;
+    const latB = (coinRng() * 2 - 1) * coinMaxLat;
+    const arcAmp = (coinRng() * 2 - 1) * Math.min(2.2, coinMaxLat);
+
+    for (let c = 0; c < rowCount; c++) {
+      const sCoin = sRowStart + c * COIN_SPACING;
+      if (sCoin >= gameLength - 45) break;
+
+      const u = rowCount > 1 ? c / (rowCount - 1) : 0;
+      let latCoin = 0;
+      if (shape === 'straight') {
+        latCoin = latA;
+      } else if (shape === 'diagonal') {
+        latCoin = latA + (latB - latA) * u;
+      } else {
+        latCoin = Math.max(
+          -coinMaxLat,
+          Math.min(
+            coinMaxLat,
+            latA * 0.45 + Math.sin(u * Math.PI) * arcAmp
+          )
+        );
+      }
+
+      // Skip if sitting on a Turbo pad (|Δs| < 4 and |Δlat| < 2.4)
+      const hitsPad = turboPads.some(
+        (pad) =>
+          Math.abs(sCoin - pad.s) < 4.0 &&
+          Math.abs(latCoin - pad.lateral) < 2.4
+      );
+      if (hitsPad) continue;
+
+      // Remove coins within ±15 units of an Energy gel
+      const nearGel = energyGels.some((gel) => Math.abs(sCoin - gel.s) <= 15.0);
+      if (nearGel) continue;
+
+      coins.push({
+        id: coinId++,
+        rowId,
+        s: sCoin,
+        t: sCoin / gameLength,
+        lateral: latCoin,
+        shape,
+      });
+    }
+
+    rowId++;
+    const rowLength = (rowCount - 1) * COIN_SPACING;
+    const gap = 35 + coinRng() * 55; // 35..90 units
+    sRowStart += rowLength + gap;
   }
 
   // Compute 1km splits
@@ -408,23 +768,15 @@ function buildCourseFromRawPoints(params: {
       const startPt = points[splitStartIdx];
       const dKm = Math.max(0.05, pt.distKm - startPt.distKm);
       const dSec = Math.max(10, pt.elapsedSeconds - startPt.elapsedSeconds);
-      let gain = 0;
-      let loss = 0;
-      for (let j = splitStartIdx + 1; j <= i; j++) {
-        const diff = points[j].ele - points[j - 1].ele;
-        if (diff > 0) gain += diff;
-        else loss += Math.abs(diff);
-      }
-      const avgGrade = ((pt.ele - startPt.ele) / (dKm * 1000)) * 100;
 
       splits.push({
         km: splitKmIndex,
         distanceKm: Number(dKm.toFixed(2)),
         durationSeconds: Math.round(dSec),
         paceMinPerKm: Number((dSec / 60 / dKm).toFixed(2)),
-        elevationGainM: Math.round(gain),
-        elevationLossM: Math.round(loss),
-        avgGradePercent: Number(avgGrade.toFixed(1)),
+        elevationGainM: 0,
+        elevationLossM: 0,
+        avgGradePercent: 0,
         startDistKm: startPt.distKm,
       });
 
@@ -433,12 +785,22 @@ function buildCourseFromRawPoints(params: {
     }
   }
 
-  const totalDistanceKm = Number(cumulativeDistKm.toFixed(2));
-  const totalDurationSeconds = Math.round(cumulativeSeconds);
+  const totalDurationSeconds = Math.round(cumulativeSec);
   const avgPaceMinPerKm =
     totalDistanceKm > 0
       ? Number((totalDurationSeconds / 60 / totalDistanceKm).toFixed(2))
-      : 5.2;
+      : 5.15;
+
+  const effSpan = Math.max(0.4, maxPace - minPace);
+  const paceBucketRanges: Record<
+    PaceBucketId,
+    { minPace: number; maxPace: number }
+  > = {
+    0: { minPace, maxPace: minPace + effSpan * 0.25 },
+    1: { minPace: minPace + effSpan * 0.25, maxPace: minPace + effSpan * 0.5 },
+    2: { minPace: minPace + effSpan * 0.5, maxPace: minPace + effSpan * 0.75 },
+    3: { minPace: minPace + effSpan * 0.75, maxPace },
+  };
 
   return {
     id: params.id,
@@ -449,33 +811,45 @@ function buildCourseFromRawPoints(params: {
     category: params.category,
     recommendedTheme: params.recommendedTheme,
     cardAura: params.cardAura,
-    totalDistanceKm,
+    totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
     totalDurationSeconds,
     avgPaceMinPerKm,
-    maxElevationM: Math.round(maxEle),
-    minElevationM: Math.round(minEle),
-    elevationGainM: Math.round(totalEleGain),
+    minPaceMinPerKm: Number(minPace.toFixed(2)),
+    maxPaceMinPerKm: Number(maxPace.toFixed(2)),
+    gameLength: Math.round(gameLength),
+    maxElevationM: 0,
+    minElevationM: 0,
+    elevationGainM: 0,
     caloriesKcal: Math.round(totalDistanceKm * 64),
-    avgCadenceSpm: Math.round(172 + (5.5 - avgPaceMinPerKm) * 4),
+    avgCadenceSpm: Math.round(174 + (5.5 - avgPaceMinPerKm) * 4),
     points,
     splits,
     landmarks: params.landmarks,
     mapPolygons: params.mapPolygons,
+    turboPads,
+    coins,
+    energyGels,
+    paceMixRatios: {
+      0: Number((bucketCounts[0] / N).toFixed(3)),
+      1: Number((bucketCounts[1] / N).toFixed(3)),
+      2: Number((bucketCounts[2] / N).toFixed(3)),
+      3: Number((bucketCounts[3] / N).toFixed(3)),
+    },
+    paceBucketRanges,
   };
 }
 
 /**
  * Smoothly interpolates dense points between waypoints using Catmull-Rom spline math.
- * Zero endpoint discontinuities: t=0 and t=1 match exact waypoint coordinates.
  */
 function densifyWaypoints(
   waypoints: Array<{
     lat: number;
     lng: number;
-    ele: number;
+    paceMinPerKm: number;
     biome: EnvironmentBiome;
   }>,
-  stepsPerSegment = 12
+  stepsPerSegment = 14
 ): RawPointInput[] {
   const result: RawPointInput[] = [];
   const n = waypoints.length;
@@ -506,59 +880,72 @@ function densifyWaypoints(
 
     for (let s = 0; s < stepsPerSegment; s++) {
       const t = s / stepsPerSegment;
-      const smoothT = t * t * (3 - 2 * t);
       const lat = catmullRom(p0.lat, p1.lat, p2.lat, p3.lat, t);
       const lng = catmullRom(p0.lng, p1.lng, p2.lng, p3.lng, t);
-      const ele = p1.ele + (p2.ele - p1.ele) * smoothT;
+      const paceMinPerKm =
+        p1.paceMinPerKm + (p2.paceMinPerKm - p1.paceMinPerKm) * t;
       result.push({
         lat,
         lng,
-        ele,
+        ele: 0,
+        paceMinPerKm,
         biome: t < 0.5 ? p1.biome : p2.biome,
       });
     }
   }
   const last = waypoints[n - 1];
-  result.push({ ...last });
+  result.push({ ...last, ele: 0 });
   return result;
 }
 
 export const PRESET_COURSES: GpxCourseData[] = [
-  // 1. Banpo Hangang Moonlight Circuit
+  // 1. Banpo Hangang Moonlight Traverse (~5.0 km -> gameLength ~ 2400)
   buildCourseFromRawPoints({
     id: 'banpo-hangang',
-    title: 'Banpo Hangang Moonlight Circuit',
+    title: 'Banpo Hangang Moonlight Traverse',
     shortTitle: 'Moonlight Flow',
     subtitle:
-      'Scenic waterfront loop from Some Sevit Island through Jamwon Grove to Dongjak Cloud Cafe',
+      '5.0 km riverside course from Dongjak Cloud Cafe past Some Sevit to Jamwon Grove',
     locationLabel: 'Banpo Hangang Park, Seoul',
     category: 'waterfront',
     recommendedTheme: 'meadow',
     cardAura: CARD_AURA_PRESETS[0],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5116, lng: 126.9942, ele: 14, biome: 'riverside' },
-        { lat: 37.5142, lng: 126.9982, ele: 16, biome: 'bridge' },
-        { lat: 37.5174, lng: 127.0035, ele: 19, biome: 'riverside' },
-        { lat: 37.5162, lng: 127.0082, ele: 18, biome: 'park' },
-        { lat: 37.5115, lng: 127.0068, ele: 21, biome: 'urban_pastel' },
-        { lat: 37.5068, lng: 127.0012, ele: 17, biome: 'urban_pastel' },
-        { lat: 37.5038, lng: 126.9935, ele: 16, biome: 'park' },
-        { lat: 37.5046, lng: 126.9862, ele: 24, biome: 'bridge' },
-        { lat: 37.5086, lng: 126.9888, ele: 15, biome: 'riverside' },
-        { lat: 37.5109, lng: 126.9928, ele: 14, biome: 'riverside' },
-      ],
-      12
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5015, lng: 126.9765, paceMinPerKm: 5.45, biome: 'bridge' },
+      { lat: 37.5048, lng: 126.9835, paceMinPerKm: 4.85, biome: 'riverside' },
+      { lat: 37.5082, lng: 126.9905, paceMinPerKm: 4.55, biome: 'park' },
+      { lat: 37.5114, lng: 126.9968, paceMinPerKm: 5.25, biome: 'riverside' },
+      { lat: 37.5145, lng: 127.0032, paceMinPerKm: 5.85, biome: 'bridge' },
+      { lat: 37.5178, lng: 127.0095, paceMinPerKm: 5.15, biome: 'riverside' },
+      { lat: 37.5215, lng: 127.0162, paceMinPerKm: 4.62, biome: 'park' },
+      { lat: 37.5252, lng: 127.0228, paceMinPerKm: 4.42, biome: 'urban_pastel' },
+    ]),
     landmarks: [
+      {
+        id: 'dongjak-cloud-cafe',
+        name: 'Dongjak Cloud Cafe Spire',
+        nameEn: 'Dongjak Cloud Cafe Spire',
+        category: 'Sky Observatory',
+        lat: 37.5048,
+        lng: 126.9842,
+        distKm: 0.65,
+        side: 'left',
+        offsetMeters: 24,
+        heightMeters: 44,
+        archStyle: 'observation_spire',
+        primaryColor: '#FDE68A',
+        accentColor: '#FB7185',
+        description:
+          'Sunset observatory café welcoming runners at the western riverfront start.',
+      },
       {
         id: 'sevit-island',
         name: 'Some Sevit Floating Dome',
         nameEn: 'Some Sevit Floating Dome',
         category: 'Waterfront Landmark',
-        lat: 37.5122,
-        lng: 126.995,
-        distKm: 0.25,
+        lat: 37.5108,
+        lng: 126.9948,
+        distKm: 1.85,
         side: 'left',
         offsetMeters: 24,
         heightMeters: 32,
@@ -573,9 +960,9 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Banpo Rainbow Bridge Arch',
         nameEn: 'Banpo Rainbow Bridge Arch',
         category: 'Bridge & Fountain',
-        lat: 37.5152,
+        lat: 37.5135,
         lng: 126.9998,
-        distKm: 0.85,
+        distKm: 2.85,
         side: 'left',
         offsetMeters: 28,
         heightMeters: 38,
@@ -590,9 +977,9 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Jamwon Pink Fluffy Grove',
         nameEn: 'Jamwon Pink Fluffy Grove',
         category: 'Riverside Park',
-        lat: 37.5168,
-        lng: 127.0068,
-        distKm: 1.65,
+        lat: 37.5202,
+        lng: 127.0125,
+        distKm: 4.15,
         side: 'right',
         offsetMeters: 22,
         heightMeters: 28,
@@ -602,40 +989,6 @@ export const PRESET_COURSES: GpxCourseData[] = [
         description:
           'Circular botanical rotunda nestled inside a grove of giant pink wool trees.',
       },
-      {
-        id: 'acroriver-pastel-towers',
-        name: 'Banpo Pastel Skyline Towers',
-        nameEn: 'Banpo Pastel Skyline Towers',
-        category: 'Urban Skyline',
-        lat: 37.5082,
-        lng: 127.0032,
-        distKm: 2.75,
-        side: 'left',
-        offsetMeters: 34,
-        heightMeters: 56,
-        archStyle: 'pastel_tower',
-        primaryColor: '#C4B5FD',
-        accentColor: '#F9A8D4',
-        description:
-          'Rounded pastel high-rise towers framing the southern Hangang parkland.',
-      },
-      {
-        id: 'dongjak-cloud-cafe',
-        name: 'Dongjak Cloud Cafe Spire',
-        nameEn: 'Dongjak Cloud Cafe Spire',
-        category: 'Sky Observatory',
-        lat: 37.5052,
-        lng: 126.9868,
-        distKm: 3.95,
-        side: 'right',
-        offsetMeters: 25,
-        heightMeters: 44,
-        archStyle: 'observation_spire',
-        primaryColor: '#FDE68A',
-        accentColor: '#FB7185',
-        description:
-          'Elevated sunset observatory café perched high above the river clouds.',
-      },
     ],
     mapPolygons: [
       {
@@ -643,76 +996,63 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Hangang Waterfront',
         type: 'water',
         coordinates: [
-          { lat: 37.507, lng: 126.982 },
-          { lat: 37.521, lng: 127.006 },
-          { lat: 37.517, lng: 127.011 },
-          { lat: 37.504, lng: 126.985 },
-        ],
-      },
-      {
-        id: 'banpo-grass-park',
-        name: 'Banpo Picnic Lawn',
-        type: 'park',
-        coordinates: [
-          { lat: 37.503, lng: 126.986 },
-          { lat: 37.516, lng: 127.008 },
-          { lat: 37.509, lng: 127.01 },
-          { lat: 37.501, lng: 126.99 },
+          { lat: 37.505, lng: 126.979 },
+          { lat: 37.524, lng: 127.014 },
+          { lat: 37.52, lng: 127.018 },
+          { lat: 37.502, lng: 126.982 },
         ],
       },
     ],
   }),
 
-  // 2. Seoul Forest & Seongsu Cloud Loop
+  // 2. Hangang 10K Grand Endurance Traverse (~10.2 km -> gameLength = 3200, includes 1 Energy Gel at 5000 m!)
   buildCourseFromRawPoints({
     id: 'seoul-forest-seongsu',
-    title: 'Seoul Forest & Seongsu Cloud Loop',
-    shortTitle: 'Cloud Exhale',
+    title: 'Hangang & Seoul Forest 10K Traverse',
+    shortTitle: 'Cloud Exhale 10K',
     subtitle:
-      'Dreamy trail connecting Mirror Pond, Brick Ateliers, and the Pedestrian Cloud Skywalk',
-    locationLabel: 'Seoul Forest · Seongsu-dong, Seoul',
+      '10.2 km endurance course featuring an Energy Gel station at 5.0 km, Turbo Pads & real pace zones',
+    locationLabel: 'Ttukseom · Seoul Forest · Jamsil, Seoul',
     category: 'forest',
     recommendedTheme: 'cloud',
     cardAura: CARD_AURA_PRESETS[1],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5444, lng: 127.0374, ele: 18, biome: 'park' },
-        { lat: 37.5472, lng: 127.0412, ele: 21, biome: 'park' },
-        { lat: 37.5462, lng: 127.0468, ele: 19, biome: 'urban_pastel' },
-        { lat: 37.5425, lng: 127.0495, ele: 20, biome: 'urban_pastel' },
-        { lat: 37.5388, lng: 127.0455, ele: 16, biome: 'park' },
-        { lat: 37.5372, lng: 127.0395, ele: 26, biome: 'bridge' },
-        { lat: 37.5405, lng: 127.0355, ele: 15, biome: 'riverside' },
-        { lat: 37.5436, lng: 127.0366, ele: 18, biome: 'park' },
-      ],
-      14
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5285, lng: 127.0185, paceMinPerKm: 5.55, biome: 'bridge' },
+      { lat: 37.5345, lng: 127.0285, paceMinPerKm: 4.95, biome: 'riverside' },
+      { lat: 37.5415, lng: 127.0385, paceMinPerKm: 4.55, biome: 'park' },
+      { lat: 37.5468, lng: 127.0495, paceMinPerKm: 5.25, biome: 'park' },
+      { lat: 37.5435, lng: 127.0625, paceMinPerKm: 5.95, biome: 'urban_pastel' },
+      { lat: 37.5365, lng: 127.0755, paceMinPerKm: 5.35, biome: 'riverside' },
+      { lat: 37.5295, lng: 127.0885, paceMinPerKm: 4.75, biome: 'riverside' },
+      { lat: 37.5225, lng: 127.1025, paceMinPerKm: 4.45, biome: 'park' },
+      { lat: 37.5165, lng: 127.1165, paceMinPerKm: 4.35, biome: 'urban_pastel' },
+    ]),
     landmarks: [
       {
-        id: 'mirror-pond',
-        name: 'Mirror Pond Lotus Pavilion',
-        nameEn: 'Mirror Pond Lotus Pavilion',
-        category: 'Eco Park',
-        lat: 37.5458,
-        lng: 127.0392,
-        distKm: 0.4,
+        id: 'deer-skywalk',
+        name: 'Cloud Pedestrian Skywalk',
+        nameEn: 'Cloud Pedestrian Skywalk',
+        category: 'Observation Bridge',
+        lat: 37.5382,
+        lng: 127.0358,
+        distKm: 1.8,
         side: 'left',
-        offsetMeters: 22,
-        heightMeters: 24,
-        archStyle: 'floating_lotus',
-        primaryColor: '#BAE6FD',
-        accentColor: '#FDE68A',
+        offsetMeters: 24,
+        heightMeters: 42,
+        archStyle: 'bridge_arch',
+        primaryColor: '#FFFBEB',
+        accentColor: '#F472B6',
         description:
-          'Shallow reflective pond mirroring pastel trees and drifting cotton clouds.',
+          'Sweeping boardwalk linking the riverside breeze to Seoul Forest.',
       },
       {
         id: 'conservatory-dome',
-        name: 'Botanical Glass Conservatory',
-        nameEn: 'Botanical Glass Conservatory',
-        category: 'Greenhouse Dome',
-        lat: 37.5464,
-        lng: 127.0435,
-        distKm: 1.05,
+        name: '5K Energy Gel Botanical Dome',
+        nameEn: '5K Energy Gel Botanical Dome',
+        category: '5000m Energy Gel Station',
+        lat: 37.5468,
+        lng: 127.0442,
+        distKm: 5.0,
         side: 'right',
         offsetMeters: 24,
         heightMeters: 34,
@@ -720,16 +1060,16 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#86EFAC',
         accentColor: '#FEF08A',
         description:
-          'Warm glowing botanical glasshouse filled with tropical pastel flora.',
+          'Halfway 5,000m Energy Gel landmark restoring full runner speed along the 10K course.',
       },
       {
         id: 'seongsu-atelier',
         name: 'Seongsu Brick Atelier District',
         nameEn: 'Seongsu Brick Atelier District',
         category: 'Creative Architecture',
-        lat: 37.5432,
-        lng: 127.0488,
-        distKm: 1.85,
+        lat: 37.5442,
+        lng: 127.0542,
+        distKm: 7.8,
         side: 'left',
         offsetMeters: 26,
         heightMeters: 36,
@@ -739,23 +1079,6 @@ export const PRESET_COURSES: GpxCourseData[] = [
         description:
           'Craft design studios blending warm terracotta brick with pastel arches.',
       },
-      {
-        id: 'deer-skywalk',
-        name: 'Cloud Pedestrian Skywalk',
-        nameEn: 'Cloud Pedestrian Skywalk',
-        category: 'Observation Bridge',
-        lat: 37.5378,
-        lng: 127.0402,
-        distKm: 3.1,
-        side: 'right',
-        offsetMeters: 24,
-        heightMeters: 42,
-        archStyle: 'bridge_arch',
-        primaryColor: '#FFFBEB',
-        accentColor: '#F472B6',
-        description:
-          'Sweeping aerial boardwalk linking Seoul Forest to the riverside breeze.',
-      },
     ],
     mapPolygons: [
       {
@@ -763,48 +1086,44 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Seoul Forest Sanctuary',
         type: 'park',
         coordinates: [
-          { lat: 37.539, lng: 127.035 },
-          { lat: 37.548, lng: 127.038 },
-          { lat: 37.547, lng: 127.046 },
-          { lat: 37.538, lng: 127.043 },
+          { lat: 37.536, lng: 127.033 },
+          { lat: 37.549, lng: 127.038 },
+          { lat: 37.548, lng: 127.058 },
+          { lat: 37.538, lng: 127.055 },
         ],
       },
     ],
   }),
 
-  // 3. Namsan North Trail Moonlight Climb
+  // 3. Namsan Moonlight Botanical Trail (~3.2 km -> gameLength ~ 1680)
   buildCourseFromRawPoints({
     id: 'namsan-circuit',
-    title: 'Namsan North Trail Moonlight Climb',
+    title: 'Namsan Moonlight Botanical Trail',
     shortTitle: 'Night Ignite',
     subtitle:
-      'Dynamic elevation climb and sweeping downhill loop beneath N Seoul Tower',
-    locationLabel: 'Namsan Park North Circuit, Seoul',
+      'Luminous night garden course sweeping cleanly around N Seoul Tower with real pace buckets',
+    locationLabel: 'Namsan Park Promenade, Seoul',
     category: 'elevation',
     recommendedTheme: 'night_garden',
     cardAura: CARD_AURA_PRESETS[2],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5522, lng: 126.9995, ele: 68, biome: 'mountain' },
-        { lat: 37.5558, lng: 126.9952, ele: 96, biome: 'mountain' },
-        { lat: 37.5572, lng: 126.9895, ele: 128, biome: 'park' },
-        { lat: 37.5548, lng: 126.9845, ele: 158, biome: 'mountain' },
-        { lat: 37.5515, lng: 126.9882, ele: 215, biome: 'mountain' },
-        { lat: 37.5495, lng: 126.9928, ele: 175, biome: 'park' },
-        { lat: 37.5508, lng: 126.9972, ele: 112, biome: 'urban_pastel' },
-        { lat: 37.5518, lng: 126.9991, ele: 72, biome: 'mountain' },
-      ],
-      14
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5502, lng: 127.0025, paceMinPerKm: 5.15, biome: 'park' },
+      { lat: 37.5538, lng: 126.9995, paceMinPerKm: 5.65, biome: 'park' },
+      { lat: 37.5568, lng: 126.9942, paceMinPerKm: 6.15, biome: 'park' },
+      { lat: 37.5572, lng: 126.9882, paceMinPerKm: 5.45, biome: 'mountain' },
+      { lat: 37.5545, lng: 126.9828, paceMinPerKm: 4.85, biome: 'mountain' },
+      { lat: 37.5505, lng: 126.9795, paceMinPerKm: 4.52, biome: 'urban_pastel' },
+      { lat: 37.5465, lng: 126.9822, paceMinPerKm: 4.38, biome: 'urban_pastel' },
+    ]),
     landmarks: [
       {
         id: 'national-theater-dome',
         name: 'National Theater Haeoreum Dome',
         nameEn: 'National Theater Haeoreum Dome',
         category: 'Cultural Landmark',
-        lat: 37.5526,
-        lng: 126.9988,
-        distKm: 0.3,
+        lat: 37.5522,
+        lng: 127.0008,
+        distKm: 0.4,
         side: 'right',
         offsetMeters: 26,
         heightMeters: 34,
@@ -812,33 +1131,16 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#F472B6',
         accentColor: '#FEF08A',
         description:
-          'Sculptural curved cultural theater welcoming runners at the Namsan trailhead.',
-      },
-      {
-        id: 'north-trail-observatory',
-        name: 'Luminous Trail Deck',
-        nameEn: 'Luminous Trail Deck',
-        category: 'Scenic Overlook',
-        lat: 37.5568,
-        lng: 126.9905,
-        distKm: 1.5,
-        side: 'left',
-        offsetMeters: 22,
-        heightMeters: 30,
-        archStyle: 'floating_lotus',
-        primaryColor: '#BEF264',
-        accentColor: '#C084FC',
-        description:
-          'Bioluminescent pastel garden terrace overlooking the downtown skyline.',
+          'Sculptural curved cultural theater welcoming runners at the trailhead.',
       },
       {
         id: 'n-seoul-tower',
         name: 'N Seoul Tower Beacon Spire',
         nameEn: 'N Seoul Tower Beacon Spire',
         category: 'Iconic Landmark',
-        lat: 37.5512,
-        lng: 126.9882,
-        distKm: 3.3,
+        lat: 37.5532,
+        lng: 126.9845,
+        distKm: 2.1,
         side: 'left',
         offsetMeters: 30,
         heightMeters: 74,
@@ -846,73 +1148,52 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#FF3366',
         accentColor: '#A855F7',
         description:
-          'Iconic hilltop observation spire projecting a vertical beam into the night sky.',
-      },
-      {
-        id: 'namsan-pastel-village',
-        name: 'Pildong Pastel Terraces',
-        nameEn: 'Pildong Pastel Terraces',
-        category: 'Hillside Village',
-        lat: 37.5504,
-        lng: 126.9962,
-        distKm: 4.6,
-        side: 'right',
-        offsetMeters: 28,
-        heightMeters: 42,
-        archStyle: 'pastel_tower',
-        primaryColor: '#60A5FA',
-        accentColor: '#F472B6',
-        description:
-          'Colorful low-rise hillside studio buildings lining the downhill stretch.',
+          'Iconic observation spire projecting a vertical beam into the night sky.',
       },
     ],
     mapPolygons: [
       {
         id: 'namsan-mountain-park',
-        name: 'Namsan Mountain Park',
+        name: 'Namsan Botanical Park',
         type: 'park',
         coordinates: [
-          { lat: 37.547, lng: 126.982 },
-          { lat: 37.559, lng: 126.984 },
-          { lat: 37.558, lng: 127.002 },
-          { lat: 37.548, lng: 127.001 },
+          { lat: 37.545, lng: 126.978 },
+          { lat: 37.559, lng: 126.982 },
+          { lat: 37.558, lng: 127.004 },
+          { lat: 37.546, lng: 127.002 },
         ],
       },
     ],
   }),
 
-  // 4. Olympic Park Mongchon Moat Loop
+  // 4. Olympic Park Mongchon Moat Stroll (~3.0 km -> gameLength ~ 1600)
   buildCourseFromRawPoints({
     id: 'olympic-park-mongchon',
-    title: 'Olympic Park Mongchon Moat Loop',
+    title: 'Olympic Park Mongchon Moat Stroll',
     shortTitle: 'Velvet Presence',
     subtitle:
-      'Healing lakeside loop past Lonely Tree Hill with a floating felt companion fish',
+      'Flat lakeside 3-lane track past World Peace Gate and Lonely Tree Meadow with a companion fish',
     locationLabel: 'Olympic Park, Songpa-gu, Seoul',
     category: 'forest',
     recommendedTheme: 'riverside',
     cardAura: CARD_AURA_PRESETS[3],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5182, lng: 127.1155, ele: 22, biome: 'park' },
-        { lat: 37.5218, lng: 127.1188, ele: 28, biome: 'riverside' },
-        { lat: 37.5245, lng: 127.1235, ele: 38, biome: 'park' },
-        { lat: 37.5215, lng: 127.1282, ele: 31, biome: 'park' },
-        { lat: 37.5168, lng: 127.1265, ele: 24, biome: 'urban_pastel' },
-        { lat: 37.5152, lng: 127.1205, ele: 20, biome: 'riverside' },
-        { lat: 37.5177, lng: 127.1159, ele: 22, biome: 'park' },
-      ],
-      14
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5155, lng: 127.1125, paceMinPerKm: 5.35, biome: 'park' },
+      { lat: 37.5188, lng: 127.1158, paceMinPerKm: 4.82, biome: 'riverside' },
+      { lat: 37.5222, lng: 127.1195, paceMinPerKm: 4.55, biome: 'riverside' },
+      { lat: 37.5248, lng: 127.1242, paceMinPerKm: 5.15, biome: 'park' },
+      { lat: 37.5232, lng: 127.1295, paceMinPerKm: 5.65, biome: 'park' },
+      { lat: 37.5195, lng: 127.1335, paceMinPerKm: 4.65, biome: 'urban_pastel' },
+    ]),
     landmarks: [
       {
         id: 'world-peace-gate',
         name: 'World Peace Gate Arch',
         nameEn: 'World Peace Gate Arch',
         category: 'Monument Arch',
-        lat: 37.5185,
-        lng: 127.116,
-        distKm: 0.25,
+        lat: 37.5175,
+        lng: 127.1145,
+        distKm: 0.45,
         side: 'left',
         offsetMeters: 26,
         heightMeters: 38,
@@ -923,30 +1204,13 @@ export const PRESET_COURSES: GpxCourseData[] = [
           'Grand winged monument arch welcoming runners at the park entrance.',
       },
       {
-        id: 'mongchon-moat',
-        name: 'Mongchon Moat Waterfront',
-        nameEn: 'Mongchon Moat Waterfront',
-        category: 'Lakeside Trail',
-        lat: 37.5215,
-        lng: 127.1185,
-        distKm: 0.95,
-        side: 'left',
-        offsetMeters: 22,
-        heightMeters: 26,
-        archStyle: 'floating_lotus',
-        primaryColor: '#67E8F9',
-        accentColor: '#FDA4AF',
-        description:
-          'Tranquil moat where pink-finned felt fish glide alongside the track.',
-      },
-      {
         id: 'lonely-tree-hill',
-        name: 'Lonely Tree Velvet Hill',
-        nameEn: 'Lonely Tree Velvet Hill',
-        category: 'Meadow Hilltop',
-        lat: 37.5242,
-        lng: 127.1232,
-        distKm: 1.85,
+        name: 'Lonely Tree Velvet Meadow',
+        nameEn: 'Lonely Tree Velvet Meadow',
+        category: 'Meadow Landmark',
+        lat: 37.5245,
+        lng: 127.1242,
+        distKm: 1.75,
         side: 'right',
         offsetMeters: 25,
         heightMeters: 35,
@@ -954,24 +1218,7 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#86EFAC',
         accentColor: '#FDE68A',
         description:
-          'Storybook tree standing atop a rolling needle-felted emerald hill.',
-      },
-      {
-        id: 'lotte-world-tower-distant',
-        name: 'Jamsil Pastel Sky Tower',
-        nameEn: 'Jamsil Pastel Sky Tower',
-        category: 'Supertall Spire',
-        lat: 37.5162,
-        lng: 127.1245,
-        distKm: 3.4,
-        side: 'right',
-        offsetMeters: 38,
-        heightMeters: 78,
-        archStyle: 'observation_spire',
-        primaryColor: '#C4B5FD',
-        accentColor: '#FDE68A',
-        description:
-          'Soaring pastel supertall spire rising into the clouds beyond the park.',
+          'Storybook tree standing on a needle-felted emerald lawn.',
       },
     ],
     mapPolygons: [
@@ -980,59 +1227,43 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Olympic Park Meadow',
         type: 'park',
         coordinates: [
-          { lat: 37.514, lng: 127.114 },
-          { lat: 37.526, lng: 127.116 },
-          { lat: 37.525, lng: 127.13 },
-          { lat: 37.514, lng: 127.128 },
-        ],
-      },
-      {
-        id: 'mongchon-water-lake',
-        name: 'Mongchon Moat & Lake',
-        type: 'water',
-        coordinates: [
-          { lat: 37.519, lng: 127.116 },
-          { lat: 37.523, lng: 127.118 },
-          { lat: 37.522, lng: 127.122 },
-          { lat: 37.518, lng: 127.12 },
+          { lat: 37.514, lng: 127.111 },
+          { lat: 37.527, lng: 127.116 },
+          { lat: 37.525, lng: 127.135 },
+          { lat: 37.515, lng: 127.132 },
         ],
       },
     ],
   }),
 
-  // 5. Yeouido Cherry Blossom Island Loop
+  // 5. Yeouido Blossom Waterfront Avenue (~3.4 km)
   buildCourseFromRawPoints({
     id: 'yeouido-cherry-loop',
-    title: 'Yeouido Blossom Island Loop',
+    title: 'Yeouido Blossom Waterfront Avenue',
     shortTitle: 'Blossom Between',
     subtitle:
-      'Breezy riverside island circuit framed by pink wool blossom tunnels and floating stages',
+      'Breezy flat riverside avenue framed by pink wool blossom tunnels and floating water stages',
     locationLabel: 'Yeouido Hangang Park, Seoul',
     category: 'waterfront',
     recommendedTheme: 'meadow',
     cardAura: CARD_AURA_PRESETS[4],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5284, lng: 126.9325, ele: 12, biome: 'riverside' },
-        { lat: 37.5318, lng: 126.9262, ele: 14, biome: 'park' },
-        { lat: 37.5335, lng: 126.9188, ele: 16, biome: 'park' },
-        { lat: 37.5292, lng: 126.9145, ele: 19, biome: 'bridge' },
-        { lat: 37.5238, lng: 126.9192, ele: 22, biome: 'urban_pastel' },
-        { lat: 37.5218, lng: 126.9275, ele: 18, biome: 'urban_pastel' },
-        { lat: 37.5252, lng: 126.9342, ele: 15, biome: 'riverside' },
-        { lat: 37.5279, lng: 126.9329, ele: 12, biome: 'riverside' },
-      ],
-      13
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5225, lng: 126.9415, paceMinPerKm: 5.25, biome: 'riverside' },
+      { lat: 37.5258, lng: 126.9362, paceMinPerKm: 4.75, biome: 'riverside' },
+      { lat: 37.5288, lng: 126.9305, paceMinPerKm: 4.48, biome: 'park' },
+      { lat: 37.5315, lng: 126.9242, paceMinPerKm: 5.05, biome: 'park' },
+      { lat: 37.5332, lng: 126.9175, paceMinPerKm: 5.55, biome: 'bridge' },
+      { lat: 37.5305, lng: 126.9115, paceMinPerKm: 4.62, biome: 'urban_pastel' },
+    ]),
     landmarks: [
       {
         id: 'yeouido-floating-stage',
         name: 'Mulbit Floating Water Stage',
         nameEn: 'Mulbit Floating Water Stage',
         category: 'Waterfront Stage',
-        lat: 37.5305,
+        lat: 37.5295,
         lng: 126.9285,
-        distKm: 0.65,
+        distKm: 1.15,
         side: 'right',
         offsetMeters: 24,
         heightMeters: 28,
@@ -1043,30 +1274,13 @@ export const PRESET_COURSES: GpxCourseData[] = [
           'Glowing shell-shaped amphitheater floating on the shimmering river surface.',
       },
       {
-        id: 'yunjungno-cherry-dome',
-        name: 'Yunjung-ro Pink Blossom Canopy',
-        nameEn: 'Yunjung-ro Pink Blossom Canopy',
-        category: 'Blossom Boulevard',
-        lat: 37.5322,
-        lng: 126.9168,
-        distKm: 1.75,
-        side: 'left',
-        offsetMeters: 22,
-        heightMeters: 32,
-        archStyle: 'dome_pavilion',
-        primaryColor: '#FFB5D8',
-        accentColor: '#FEF08A',
-        description:
-          'Dreamlike boulevard of oversized pink needle-felted cherry blossom trees.',
-      },
-      {
         id: 'parc1-pastel-spire',
         name: 'Yeouido Twin Pastel Towers',
         nameEn: 'Yeouido Twin Pastel Towers',
         category: 'Financial Skyline',
-        lat: 37.5245,
-        lng: 126.9265,
-        distKm: 3.1,
+        lat: 37.5308,
+        lng: 126.9132,
+        distKm: 2.55,
         side: 'left',
         offsetMeters: 34,
         heightMeters: 68,
@@ -1083,48 +1297,43 @@ export const PRESET_COURSES: GpxCourseData[] = [
         name: 'Yeouido Island Park',
         type: 'park',
         coordinates: [
-          { lat: 37.521, lng: 126.915 },
-          { lat: 37.534, lng: 126.916 },
-          { lat: 37.532, lng: 126.935 },
-          { lat: 37.522, lng: 126.933 },
+          { lat: 37.521, lng: 126.91 },
+          { lat: 37.535, lng: 126.914 },
+          { lat: 37.533, lng: 126.943 },
+          { lat: 37.521, lng: 126.939 },
         ],
       },
     ],
   }),
 
-  // 6. Bukaksan Skyway & Seokchon Echo Ridge
+  // 6. Bukaksan Octagonal Skyway Promenade (~3.3 km)
   buildCourseFromRawPoints({
     id: 'bukaksan-skyway-ridge',
-    title: 'Bukaksan Octagonal Skyway Ridge',
+    title: 'Bukaksan Octagonal Skyway Promenade',
     shortTitle: 'Skyway Echo',
     subtitle:
-      'High-altitude ridge run along the pastel fortress wall to Palgakjeong Pavilion',
+      'Panoramic starlight promenade passing Changuimun Gate and Palgakjeong Pavilion',
     locationLabel: 'Bukaksan Skyway, Jongno-gu, Seoul',
     category: 'elevation',
     recommendedTheme: 'night_garden',
     cardAura: CARD_AURA_PRESETS[5],
-    rawPoints: densifyWaypoints(
-      [
-        { lat: 37.5925, lng: 126.9685, ele: 145, biome: 'mountain' },
-        { lat: 37.5968, lng: 126.9732, ele: 198, biome: 'mountain' },
-        { lat: 37.6005, lng: 126.9795, ele: 265, biome: 'mountain' },
-        { lat: 37.6012, lng: 126.9858, ele: 312, biome: 'bridge' },
-        { lat: 37.5972, lng: 126.9885, ele: 254, biome: 'park' },
-        { lat: 37.5922, lng: 126.9835, ele: 188, biome: 'urban_pastel' },
-        { lat: 37.5898, lng: 126.9755, ele: 152, biome: 'park' },
-        { lat: 37.5919, lng: 126.9692, ele: 146, biome: 'mountain' },
-      ],
-      13
-    ),
+    rawPoints: densifyWaypoints([
+      { lat: 37.5915, lng: 126.9645, paceMinPerKm: 5.65, biome: 'park' },
+      { lat: 37.5955, lng: 126.9695, paceMinPerKm: 6.12, biome: 'mountain' },
+      { lat: 37.5992, lng: 126.9755, paceMinPerKm: 5.45, biome: 'mountain' },
+      { lat: 37.6012, lng: 126.9822, paceMinPerKm: 4.88, biome: 'bridge' },
+      { lat: 37.5995, lng: 126.9888, paceMinPerKm: 4.55, biome: 'park' },
+      { lat: 37.5955, lng: 126.9942, paceMinPerKm: 4.42, biome: 'urban_pastel' },
+    ]),
     landmarks: [
       {
         id: 'changuimun-arch',
         name: 'Changuimun Cloud Fortress Gate',
         nameEn: 'Changuimun Cloud Fortress Gate',
         category: 'Heritage Gate',
-        lat: 37.5932,
-        lng: 126.9695,
-        distKm: 0.35,
+        lat: 37.5938,
+        lng: 126.9675,
+        distKm: 0.45,
         side: 'left',
         offsetMeters: 24,
         heightMeters: 30,
@@ -1132,16 +1341,16 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#A78BFA',
         accentColor: '#76FFB2',
         description:
-          'Mountain ridge gate glowing softly against the indigo night sky.',
+          'Historic fortress gate glowing softly against the indigo night sky.',
       },
       {
         id: 'palgakjeong-sky-pavilion',
         name: 'Palgakjeong Octagonal Sky Spire',
         nameEn: 'Palgakjeong Octagonal Sky Spire',
-        category: 'Summit Observatory',
+        category: 'Skyway Observatory',
         lat: 37.6008,
         lng: 126.9812,
-        distKm: 2.15,
+        distKm: 1.65,
         side: 'right',
         offsetMeters: 26,
         heightMeters: 52,
@@ -1149,36 +1358,19 @@ export const PRESET_COURSES: GpxCourseData[] = [
         primaryColor: '#F472B6',
         accentColor: '#FEF08A',
         description:
-          'Summit pavilion at 312m elevation commanding a 360-degree pastel panorama.',
-      },
-      {
-        id: 'samcheong-garden-dome',
-        name: 'Samcheong Woodland Botanic Dome',
-        nameEn: 'Samcheong Woodland Botanic Dome',
-        category: 'Forest Sanctuary',
-        lat: 37.5915,
-        lng: 126.9815,
-        distKm: 3.65,
-        side: 'left',
-        offsetMeters: 24,
-        heightMeters: 34,
-        archStyle: 'dome_pavilion',
-        primaryColor: '#67E8F9',
-        accentColor: '#F9A8D4',
-        description:
-          'Tranquil woodland sanctuary tucked beneath the descending mountain ridge.',
+          'Octagonal pavilion commanding a 360-degree pastel panorama.',
       },
     ],
     mapPolygons: [
       {
         id: 'bukaksan-ridge-zone',
-        name: 'Bukaksan Forest Ridge',
+        name: 'Bukaksan Forest Sanctuary',
         type: 'park',
         coordinates: [
-          { lat: 37.589, lng: 126.967 },
-          { lat: 37.603, lng: 126.972 },
-          { lat: 37.602, lng: 126.99 },
-          { lat: 37.588, lng: 126.985 },
+          { lat: 37.589, lng: 126.963 },
+          { lat: 37.603, lng: 126.97 },
+          { lat: 37.602, lng: 126.996 },
+          { lat: 37.59, lng: 126.992 },
         ],
       },
     ],
@@ -1219,16 +1411,8 @@ export function parseGpxFileContent(
   }
 
   if (ptNodes.length < 2) {
-    throw new Error(
-      'Not enough valid GPX track points (<trkpt> or <rtept>) found in file.'
-    );
+    throw new Error('Route is too short (needs at least 200 m).');
   }
-
-  const maxPoints = 200;
-  const stride = Math.max(1, Math.floor(ptNodes.length / maxPoints));
-  const sampledNodes = ptNodes.filter(
-    (_, idx) => idx % stride === 0 || idx === ptNodes.length - 1
-  );
 
   const biomes: EnvironmentBiome[] = [
     'riverside',
@@ -1238,21 +1422,19 @@ export function parseGpxFileContent(
     'mountain',
   ];
 
-  const rawPoints: RawPointInput[] = sampledNodes.map((node, idx) => {
+  const rawPoints: RawPointInput[] = ptNodes.map((node, idx) => {
     const lat = parseFloat(node.getAttribute('lat') || '37.5114');
     const lng = parseFloat(node.getAttribute('lon') || '126.9955');
-    const eleText = node.querySelector('ele')?.textContent;
-    const ele = eleText ? parseFloat(eleText) : 15 + Math.sin(idx * 0.2) * 8;
     const timeText = node.querySelector('time')?.textContent;
     const timeMs = timeText ? Date.parse(timeText) : undefined;
     const biome =
       biomes[
-        Math.floor((idx / sampledNodes.length) * biomes.length) % biomes.length
+        Math.floor((idx / ptNodes.length) * biomes.length) % biomes.length
       ];
     return {
       lat: Number.isFinite(lat) ? lat : 37.5114,
       lng: Number.isFinite(lng) ? lng : 126.9955,
-      ele: Number.isFinite(ele) ? ele : 15,
+      ele: 0,
       timeMs: Number.isFinite(timeMs) ? timeMs : undefined,
       biome,
     };
@@ -1265,7 +1447,7 @@ export function parseGpxFileContent(
     id: `custom-${Date.now()}`,
     title: rawTitle,
     shortTitle: rawTitle.slice(0, 16),
-    subtitle: `Imported GPX Track (${sampledNodes.length} trackpoints mapped)`,
+    subtitle: `Imported GPX Course (N=1200 spaced samples · Real Pace Buckets)`,
     locationLabel: `Lat ${rawPoints[0].lat.toFixed(3)}° · Lng ${rawPoints[0].lng.toFixed(3)}°`,
     category: 'custom',
     recommendedTheme: 'meadow',
@@ -1310,7 +1492,7 @@ export function parseGpxFileContent(
       id: `custom-lm-${i}`,
       name: `${pt.distKm.toFixed(1)}km Pastel ${styleName}`,
       nameEn: `Pastel ${styleName} ${i + 1}`,
-      category: `Elevation ${pt.ele.toFixed(0)}m Surroundings`,
+      category: 'Route Landmark',
       lat: pt.lat + (side === 'left' ? 0.0007 : -0.0007),
       lng: pt.lng + (side === 'left' ? -0.0007 : 0.0007),
       distKm: pt.distKm,
@@ -1320,9 +1502,9 @@ export function parseGpxFileContent(
       archStyle: style,
       primaryColor: colors[i % colors.length],
       accentColor: colors[(i + 2) % colors.length],
-      description: `Procedural 3D pastel landmark synthesized from terrain and elevation (${pt.ele.toFixed(
-        1
-      )}m) at the ${pt.distKm.toFixed(2)}km mark.`,
+      description: `Procedural 3D pastel landmark synthesized along your GPX route at the ${pt.distKm.toFixed(
+        2
+      )}km mark.`,
     });
   }
 
@@ -1331,15 +1513,18 @@ export function parseGpxFileContent(
 }
 
 export function exportCourseToGpxXml(course: GpxCourseData): string {
+  // Sample 200 points when exporting so XML size stays compact
+  const step = Math.max(1, Math.floor(course.points.length / 200));
   const trkpts = course.points
+    .filter((_, idx) => idx % step === 0 || idx === course.points.length - 1)
     .map(
       (pt) =>
-        `      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}">\n        <ele>${pt.ele.toFixed(1)}</ele>\n        <time>${pt.timeIso}</time>\n      </trkpt>`
+        `      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}">\n        <ele>0.0</ele>\n        <time>${pt.timeIso}</time>\n      </trkpt>`
     )
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Somteol Run 3D GPX World" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Pace Runner 3D GPX World" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${course.title}</name>
     <desc>${course.subtitle}</desc>

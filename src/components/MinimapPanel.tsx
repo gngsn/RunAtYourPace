@@ -7,17 +7,10 @@ import {
   useMapsLibrary,
 } from '@vis.gl/react-google-maps';
 import {
-  Building2,
-  Compass,
-  Expand,
-  Layers,
-  MapPin,
-  Minimize2,
-} from 'lucide-react';
-import {
   ArtworkThemeId,
   GpxCourseData,
   GpxTrackPoint,
+  PACE_BUCKETS,
   SurroundingLandmark,
 } from '../types/gpx';
 import { ARTWORK_THEMES } from '../utils/gpxParser';
@@ -81,7 +74,6 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
   currentPoint,
   progressRatio,
   themeId,
-  selectedLandmark,
   onSelectLandmark,
   onSeekRatio,
 }) => {
@@ -93,7 +85,6 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
     'pastel_vector'
   );
   const [googleMapUnavailable, setGoogleMapUnavailable] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const onAuthErr = () => {
@@ -113,8 +104,8 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
-    const padLat = Math.max(0.0016, (maxLat - minLat) * 0.22);
-    const padLng = Math.max(0.0016, (maxLng - minLng) * 0.22);
+    const padLat = Math.max(0.0014, (maxLat - minLat) * 0.2);
+    const padLng = Math.max(0.0014, (maxLng - minLng) * 0.2);
     return {
       minLat: minLat - padLat,
       maxLat: maxLat + padLat,
@@ -126,42 +117,14 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
   const projectLatLng = (lat: number, lng: number) => {
     const x =
       ((lng - bounds.minLng) / Math.max(0.0001, bounds.maxLng - bounds.minLng)) *
-      280;
+      240;
     const y =
       (1 -
         (lat - bounds.minLat) /
           Math.max(0.0001, bounds.maxLat - bounds.minLat)) *
-      200;
+      180;
     return { x, y };
   };
-
-  const buildingFootprints = useMemo(() => {
-    const boxes: Array<{
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      rot: number;
-      color: string;
-    }> = [];
-    const step = Math.max(2, Math.floor(course.points.length / 28));
-    for (let i = 0; i < course.points.length; i += step) {
-      const pt = course.points[i];
-      const p = projectLatLng(pt.lat, pt.lng);
-      const side = i % 2 === 0 ? 1 : -1;
-      const offset = 15 + (i % 3) * 6;
-      const angle = i * 0.5;
-      boxes.push({
-        x: p.x + Math.cos(angle) * offset * side,
-        y: p.y + Math.sin(angle) * offset * side,
-        w: 6 + (i % 4) * 2.5,
-        h: 5 + ((i * 3) % 4) * 2.2,
-        rot: (i * 23) % 90,
-        color: theme.buildingPalette[i % theme.buildingPalette.length],
-      });
-    }
-    return boxes;
-  }, [course, bounds, theme]);
 
   const trackSvgPoints = useMemo(() => {
     return course.points
@@ -170,6 +133,48 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
+  }, [course, bounds]);
+
+  // Pace-colored route segments on the map
+  const paceSegments = useMemo(() => {
+    const segs: Array<{ points: string; color: string }> = [];
+    const pts = course.points;
+    if (pts.length < 2) return segs;
+
+    const step = Math.max(1, Math.floor(pts.length / 180));
+    let currentBucket = pts[0].paceBucket ?? 1;
+    let currentCoords: string[] = [];
+
+    for (let i = 0; i < pts.length; i += step) {
+      const pt = pts[i];
+      const proj = projectLatLng(pt.lat, pt.lng);
+      const coord = `${proj.x.toFixed(1)},${proj.y.toFixed(1)}`;
+      const bucket = pt.paceBucket ?? 1;
+
+      if (bucket !== currentBucket && currentCoords.length >= 2) {
+        currentCoords.push(coord);
+        segs.push({
+          points: currentCoords.join(' '),
+          color: PACE_BUCKETS[currentBucket]?.color || '#3fc39a',
+        });
+        currentBucket = bucket;
+        currentCoords = [coord];
+      } else {
+        currentCoords.push(coord);
+      }
+    }
+
+    const lastPt = pts[pts.length - 1];
+    const lastProj = projectLatLng(lastPt.lat, lastPt.lng);
+    currentCoords.push(`${lastProj.x.toFixed(1)},${lastProj.y.toFixed(1)}`);
+
+    if (currentCoords.length >= 2) {
+      segs.push({
+        points: currentCoords.join(' '),
+        color: PACE_BUCKETS[currentBucket]?.color || '#3fc39a',
+      });
+    }
+    return segs;
   }, [course, bounds]);
 
   const traversedSvgPoints = useMemo(() => {
@@ -186,42 +191,13 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
       .join(' ');
   }, [course, bounds, progressRatio]);
 
-  const directionArrows = useMemo(() => {
-    const arrows: Array<{ x: number; y: number; deg: number }> = [];
-    const count = 7;
-    for (let i = 1; i <= count; i++) {
-      const idx = Math.min(
-        course.points.length - 2,
-        Math.floor((i / (count + 1)) * course.points.length)
-      );
-      const p1 = projectLatLng(course.points[idx].lat, course.points[idx].lng);
-      const p2 = projectLatLng(
-        course.points[idx + 1].lat,
-        course.points[idx + 1].lng
-      );
-      const deg =
-        (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
-      arrows.push({ x: p1.x, y: p1.y, deg });
-    }
-    return arrows;
-  }, [course, bounds]);
-
-  const kmMarkers = useMemo(() => {
-    const list: Array<{ km: number; x: number; y: number }> = [];
-    const maxKm = Math.floor(course.totalDistanceKm);
-    for (let k = 1; k <= maxKm; k++) {
-      const pt =
-        course.points.find((p) => p.distKm >= k) ||
-        course.points[course.points.length - 1];
-      const proj = projectLatLng(pt.lat, pt.lng);
-      list.push({ km: k, x: proj.x, y: proj.y });
-    }
-    return list;
-  }, [course, bounds]);
-
   const startProjected = projectLatLng(
     course.points[0].lat,
     course.points[0].lng
+  );
+  const finishProjected = projectLatLng(
+    course.points[course.points.length - 1].lat,
+    course.points[course.points.length - 1].lng
   );
   const runnerProjected = projectLatLng(currentPoint.lat, currentPoint.lng);
 
@@ -238,65 +214,9 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
       180) /
     Math.PI;
 
-  const biomeLabelMap: Record<string, string> = {
-    riverside: 'Waterfront Trail · Shimmering River',
-    park: 'Pink Fluffy Grove · Neon Meadow',
-    urban_pastel: 'Urban Pastel Skyline District',
-    bridge: 'Cloud Arch Bridge · Sky Overlook',
-    mountain: 'Moonlight Ridge · Forest Climb',
-  };
-
   return (
-    <aside
-      className={`transition-transform duration-200 ${
-        isExpanded ? 'w-[380px]' : 'w-[325px]'
-      } bg-[#11132E]/95 border border-white/15 rounded-2xl shadow-2xl overflow-hidden text-slate-100`}
-    >
-      {/* Minimap Top Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-white/10">
-        <div className="flex items-center gap-2 min-w-0">
-          <Compass className="w-4 h-4 text-[#FF85B8] shrink-0" />
-          <span className="text-xs font-semibold tracking-tight truncate">
-            {course.locationLabel}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          {hasValidFormatKey && !googleMapUnavailable && (
-            <button
-              type="button"
-              onClick={() =>
-                setMapMode((m) =>
-                  m === 'pastel_vector' ? 'google_live' : 'pastel_vector'
-                )
-              }
-              className="px-2 py-1 text-[11px] font-medium rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors whitespace-nowrap shrink-0"
-              title="Toggle Map View"
-            >
-              {mapMode === 'google_live' ? 'Pastel Vector' : 'Google Maps'}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setIsExpanded((v) => !v)}
-            className="p-1 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title={isExpanded ? 'Collapse Minimap' : 'Expand Minimap'}
-          >
-            {isExpanded ? (
-              <Minimize2 className="w-3.5 h-3.5" />
-            ) : (
-              <Expand className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Map Viewport */}
-      <div
-        className={`relative w-full ${
-          isExpanded ? 'h-[250px]' : 'h-[205px]'
-        } bg-[#080A1C] overflow-hidden`}
-      >
+    <aside className="w-[220px] sm:w-[250px] bg-[#0B0C22]/85 backdrop-blur-md border border-white/15 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto">
+      <div className="relative w-full h-[165px] sm:h-[185px] bg-[#080A1C] overflow-hidden">
         {mapMode === 'google_live' &&
         hasValidFormatKey &&
         !googleMapUnavailable ? (
@@ -346,12 +266,12 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
           </APIProvider>
         ) : (
           <svg
-            viewBox="0 0 280 200"
+            viewBox="0 0 240 180"
             className="w-full h-full cursor-pointer"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              const clickX = ((e.clientX - rect.left) / rect.width) * 280;
-              const clickY = ((e.clientY - rect.top) / rect.height) * 200;
+              const clickX = ((e.clientX - rect.left) / rect.width) * 240;
+              const clickY = ((e.clientY - rect.top) / rect.height) * 180;
               let bestIdx = 0;
               let bestDist = Infinity;
               course.points.forEach((pt, idx) => {
@@ -370,330 +290,125 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
                 <stop
                   offset="0%"
                   stopColor={theme.treeFoliagePrimaryHex}
-                  stopOpacity="0.22"
+                  stopOpacity="0.2"
                 />
                 <stop offset="100%" stopColor="#080A1C" stopOpacity="0" />
               </radialGradient>
             </defs>
 
-            <rect width="280" height="200" fill="url(#pastelMapGlow)" />
-            {[40, 80, 120, 160, 200, 240].map((gx) => (
+            <rect width="240" height="180" fill="url(#pastelMapGlow)" />
+            {[40, 80, 120, 160, 200].map((gx) => (
               <line
                 key={`gx-${gx}`}
                 x1={gx}
                 y1={0}
                 x2={gx}
-                y2={200}
-                stroke="rgba(255,255,255,0.06)"
+                y2={180}
+                stroke="rgba(255,255,255,0.05)"
                 strokeWidth="1"
               />
             ))}
-            {[40, 80, 120, 160].map((gy) => (
+            {[45, 90, 135].map((gy) => (
               <line
                 key={`gy-${gy}`}
                 x1={0}
                 y1={gy}
-                x2={280}
+                x2={240}
                 y2={gy}
-                stroke="rgba(255,255,255,0.06)"
+                stroke="rgba(255,255,255,0.05)"
                 strokeWidth="1"
               />
             ))}
 
-            {/* Water & Park Terrain Polygons */}
-            {course.mapPolygons.map((poly) => {
-              const pts = poly.coordinates
-                .map((c) => {
-                  const p = projectLatLng(c.lat, c.lng);
-                  return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-                })
-                .join(' ');
-              return (
-                <polygon
-                  key={poly.id}
-                  points={pts}
-                  fill={
-                    poly.type === 'water'
-                      ? 'rgba(56, 189, 248, 0.2)'
-                      : 'rgba(118, 255, 178, 0.15)'
-                  }
-                  stroke={
-                    poly.type === 'water'
-                      ? 'rgba(56, 189, 248, 0.4)'
-                      : 'rgba(118, 255, 178, 0.35)'
-                  }
-                  strokeWidth="1"
-                />
-              );
-            })}
-
-            {/* Surrounding 2.5D Building Footprints */}
-            {buildingFootprints.map((b, idx) => (
-              <rect
-                key={`bld-${idx}`}
-                x={b.x - b.w / 2}
-                y={b.y - b.h / 2}
-                width={b.w}
-                height={b.h}
-                rx={1.5}
-                fill={b.color}
-                fillOpacity={0.28}
-                stroke={b.color}
-                strokeOpacity={0.6}
-                strokeWidth={0.8}
-                transform={`rotate(${b.rot} ${b.x} ${b.y})`}
-              />
-            ))}
-
-            {/* 1. Wide Outer Route Glow */}
+            {/* 1. Outer Route Glow */}
             <polyline
               fill="none"
               stroke={theme.treeFoliagePrimaryHex}
-              strokeOpacity="0.28"
-              strokeWidth="12"
+              strokeOpacity="0.22"
+              strokeWidth="10"
               strokeLinecap="round"
               strokeLinejoin="round"
               points={trackSvgPoints}
             />
 
-            {/* 2. Crisp Dark Roadbed Casing */}
+            {/* 2. Dark Roadbed Casing */}
             <polyline
               fill="none"
               stroke="#050714"
-              strokeWidth="8"
+              strokeWidth="7"
               strokeLinecap="round"
               strokeLinejoin="round"
               points={trackSvgPoints}
             />
 
-            {/* 3. Full GPX Course Base Line */}
-            <polyline
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.55)"
-              strokeWidth="4.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={trackSvgPoints}
-            />
+            {/* 3. Real Pace Colored Route Segments */}
+            {paceSegments.map((seg, i) => (
+              <polyline
+                key={`pace-seg-${i}`}
+                fill="none"
+                stroke={seg.color}
+                strokeOpacity="0.55"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={seg.points}
+              />
+            ))}
 
-            {/* 4. Dashed Center Lane Markings */}
+            {/* 4. Active Traversed Segment */}
             <polyline
               fill="none"
               stroke="#FFFFFF"
-              strokeOpacity="0.7"
-              strokeWidth="1.4"
-              strokeDasharray="4 5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={trackSvgPoints}
-            />
-
-            {/* 5. Active Traversed GPX Segment */}
-            <polyline
-              fill="none"
-              stroke={theme.groundPrimaryHex}
-              strokeWidth="5"
+              strokeWidth="4.2"
               strokeLinecap="round"
               strokeLinejoin="round"
               points={traversedSvgPoints}
             />
 
-            {/* 6. Directional Chevrons along the GPX Track */}
-            {directionArrows.map((arr, idx) => (
-              <g
-                key={`arr-${idx}`}
-                transform={`translate(${arr.x}, ${arr.y}) rotate(${arr.deg})`}
-              >
-                <polygon
-                  points="-3,-3.5 4,0 -3,3.5"
-                  fill="#FFFFFF"
-                  fillOpacity="0.9"
-                />
-              </g>
-            ))}
-
-            {/* 7. Kilometer Split Markers */}
-            {kmMarkers.map((m) => (
-              <g key={`km-${m.km}`} transform={`translate(${m.x}, ${m.y})`}>
-                <rect
-                  x="-11"
-                  y="-7"
-                  width="22"
-                  height="14"
-                  rx="4"
-                  fill="#0B0C22"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.2"
-                />
-                <text
-                  x="0"
-                  y="3"
-                  textAnchor="middle"
-                  fill="#FFFFFF"
-                  fontSize="7.5"
-                  fontWeight="700"
-                >
-                  {m.km}K
-                </text>
-              </g>
-            ))}
-
-            {/* 8. START Badge */}
+            {/* 5. START Marker */}
             <g
               transform={`translate(${startProjected.x}, ${startProjected.y})`}
             >
               <circle
-                r="6"
-                fill="#FF85B8"
-                stroke="#FFFFFF"
-                strokeWidth="1.8"
+                r="5"
+                fill="#3fc39a"
+                stroke="#0B0C22"
+                strokeWidth="1.5"
               />
-              <text
-                x="0"
-                y="2.5"
-                textAnchor="middle"
-                fill="#0B0C22"
-                fontSize="7"
-                fontWeight="800"
-              >
-                S
-              </text>
             </g>
 
-            {/* 9. Surrounding Landmark Pins */}
-            {course.landmarks.map((lm) => {
-              const p = projectLatLng(lm.lat, lm.lng);
-              const isSelected = selectedLandmark?.id === lm.id;
-              return (
-                <g
-                  key={lm.id}
-                  className="cursor-pointer"
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    onSelectLandmark(lm);
-                    onSeekRatio(
-                      Math.min(
-                        0.99,
-                        lm.distKm / Math.max(0.1, course.totalDistanceKm)
-                      )
-                    );
-                  }}
-                >
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={isSelected ? 7.5 : 5}
-                    fill={lm.primaryColor}
-                    stroke="#0B0C22"
-                    strokeWidth="1.5"
-                  />
-                  <text
-                    x={p.x}
-                    y={p.y - 8}
-                    textAnchor="middle"
-                    fill="#F8FAFC"
-                    fontSize="8.5"
-                    fontWeight="600"
-                  >
-                    {lm.name.split(' ')[0]}
-                  </text>
-                </g>
-              );
-            })}
+            {/* 6. FINISH Marker */}
+            <g
+              transform={`translate(${finishProjected.x}, ${finishProjected.y})`}
+            >
+              <circle
+                r="5.5"
+                fill="#FACC15"
+                stroke="#0B0C22"
+                strokeWidth="1.5"
+              />
+            </g>
 
-            {/* 10. Current Runner Directional Cone & Glowing Marker */}
+            {/* 7. Current Runner Directional Cone & Glowing Marker */}
             <g
               transform={`translate(${runnerProjected.x}, ${runnerProjected.y})`}
             >
               <g transform={`rotate(${headingDeg})`}>
                 <polygon
-                  points="0,0 22,-9 22,9"
+                  points="0,0 18,-7 18,7"
                   fill={theme.groundPrimaryHex}
-                  fillOpacity="0.4"
+                  fillOpacity="0.45"
                 />
               </g>
               <circle
-                r="7.5"
+                r="6.5"
                 fill={theme.groundPrimaryHex}
                 stroke="#0B0C22"
-                strokeWidth="2.2"
+                strokeWidth="2"
               />
-              <circle r="3" fill="#FFFFFF" />
+              <circle r="2.5" fill="#FFFFFF" />
             </g>
           </svg>
-        )}
-
-        {/* Live GPS Coordinate Readout Overlay */}
-        <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[11px] font-mono-tabular text-slate-300 bg-[#0B0C22]/90 px-2.5 py-1 rounded-lg border border-white/10">
-          <span>
-            {currentPoint.lat.toFixed(4)}°N · {currentPoint.lng.toFixed(4)}°E
-          </span>
-          <span className="text-[#76FFB2]">Click path to warp</span>
-        </div>
-      </div>
-
-      {/* Surrounding Environment & Landmark Inspector */}
-      <div className="p-3 space-y-2.5 bg-[#131636]">
-        <div className="flex items-center justify-between text-xs text-slate-300">
-          <span className="flex items-center gap-1.5 font-medium text-white">
-            <Layers className="w-3.5 h-3.5 text-[#76FFB2]" />
-            Surrounding Biome
-          </span>
-          <span className="text-[11px] text-slate-300">
-            {biomeLabelMap[currentPoint.biome] || 'Pastel Meadow Terrain'}
-          </span>
-        </div>
-
-        {/* Landmark Quick Selector Strip */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {course.landmarks.map((lm) => {
-            const active = selectedLandmark?.id === lm.id;
-            return (
-              <button
-                key={lm.id}
-                type="button"
-                onClick={() => {
-                  onSelectLandmark(lm);
-                  onSeekRatio(
-                    Math.min(
-                      0.99,
-                      lm.distKm / Math.max(0.1, course.totalDistanceKm)
-                    )
-                  );
-                }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
-                  active
-                    ? 'bg-white text-[#0B0C22] border-white shadow-sm'
-                    : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <Building2 className="w-3 h-3 shrink-0" />
-                <span>{lm.name}</span>
-                <span className="opacity-70 font-mono-tabular">
-                  {lm.distKm.toFixed(1)}km
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected Landmark Detail Box */}
-        {selectedLandmark && (
-          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-white flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#FF85B8]" />
-                {selectedLandmark.name}
-              </span>
-              <span className="font-mono-tabular text-[11px] text-slate-300">
-                {selectedLandmark.distKm.toFixed(2)} km · Height{' '}
-                {selectedLandmark.heightMeters}m
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              {selectedLandmark.description}
-            </p>
-          </div>
         )}
       </div>
     </aside>

@@ -358,6 +358,52 @@ export function createFeltRunnerRig(
   rightBun.position.set(0.28, 0.34, -0.04);
   topknotGroup.add(leftBun, rightBun);
 
+  // 3D. Style 4: Mint Aero Visor & Wing Headband (mint_sprinter)
+  const mintVisorGroup = new THREE.Group();
+  headGroup.add(mintVisorGroup);
+  const visorMat = createFeltMaterial('#6EE7B7', bumpMap, {
+    emissiveHex: '#34D399',
+    emissiveIntensity: 0.3,
+  });
+  const bandRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.39, 0.055, 10, 24),
+    visorMat
+  );
+  bandRing.rotation.x = Math.PI / 2;
+  bandRing.position.y = 0.16;
+  const visorBill = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.44, 0.48, 0.05, 20, 1, false, -0.9, 1.8),
+    visorMat
+  );
+  visorBill.position.set(0, 0.14, 0.15);
+  mintVisorGroup.add(bandRing, visorBill);
+
+  // 3E. Style 5: Starlight Felt Fox Ears & Star Crest (starlight_fox)
+  const foxEarsGroup = new THREE.Group();
+  headGroup.add(foxEarsGroup);
+  const foxMat = createFeltMaterial('#FDBA74', bumpMap, {
+    emissiveHex: '#FB923C',
+    emissiveIntensity: 0.28,
+  });
+  const leftEar = new THREE.Mesh(
+    new THREE.ConeGeometry(0.17, 0.36, 12),
+    foxMat
+  );
+  leftEar.position.set(-0.24, 0.42, 0.02);
+  leftEar.rotation.z = 0.25;
+  const rightEar = new THREE.Mesh(
+    new THREE.ConeGeometry(0.17, 0.36, 12),
+    foxMat
+  );
+  rightEar.position.set(0.24, 0.42, 0.02);
+  rightEar.rotation.z = -0.25;
+  const starCrest = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.14, 0),
+    centerGemMat
+  );
+  starCrest.position.set(0, 0.52, 0.12);
+  foxEarsGroup.add(leftEar, rightEar, starCrest);
+
   // 4. Articulated Left & Right Arms
   const createArm = (side: -1 | 1) => {
     const pivot = new THREE.Group();
@@ -474,23 +520,47 @@ export function createFeltRunnerRig(
 
   let currentCharId: CharacterModelId = initialCharacter;
 
+  const CHAR_OUTFITS: Record<
+    CharacterModelId,
+    { sweater: string; pants: string; hat: string }
+  > = {
+    hoodie_kid: { sweater: '#FEF08A', pants: '#93C5FD', hat: '#FDE047' },
+    flower_orb: { sweater: '#FBCFE8', pants: '#A7F3D0', hat: '#FF85B8' },
+    topknot_kid: { sweater: '#DDD6FE', pants: '#FDE68A', hat: '#C4B5FD' },
+    mint_sprinter: { sweater: '#6EE7B7', pants: '#38BDF8', hat: '#34D399' },
+    starlight_fox: { sweater: '#FED7AA', pants: '#C4B5FD', hat: '#FB923C' },
+  };
+
   const setCharacterModel = (modelId: CharacterModelId) => {
     currentCharId = modelId;
     hatGroup.visible = modelId === 'hoodie_kid';
     flowerCrownGroup.visible = modelId === 'flower_orb';
     topknotGroup.visible = modelId === 'topknot_kid';
+    mintVisorGroup.visible = modelId === 'mint_sprinter';
+    foxEarsGroup.visible = modelId === 'starlight_fox';
+
+    const outfit = CHAR_OUTFITS[modelId] || CHAR_OUTFITS.hoodie_kid;
+    sweaterMat.color.set(outfit.sweater);
+    sweaterMat.emissive.set(outfit.sweater);
+    pantsMat.color.set(outfit.pants);
+    pantsMat.emissive.set(outfit.pants);
+    hatMat.color.set(outfit.hat);
+    hatMat.emissive.set(outfit.hat);
   };
 
   const updateThemeStyle = (
     theme: ArtworkThemeConfig,
     themeId: ArtworkThemeId
   ) => {
-    sweaterMat.color.set(theme.runnerSweaterHex);
-    sweaterMat.emissive.set(theme.runnerSweaterHex);
-    pantsMat.color.set(theme.runnerPantsHex);
-    pantsMat.emissive.set(theme.runnerPantsHex);
-    hatMat.color.set(theme.runnerHatHex);
-    hatMat.emissive.set(theme.runnerHatHex);
+    const outfit = CHAR_OUTFITS[currentCharId];
+    if (!outfit) {
+      sweaterMat.color.set(theme.runnerSweaterHex);
+      sweaterMat.emissive.set(theme.runnerSweaterHex);
+      pantsMat.color.set(theme.runnerPantsHex);
+      pantsMat.emissive.set(theme.runnerPantsHex);
+      hatMat.color.set(theme.runnerHatHex);
+      hatMat.emissive.set(theme.runnerHatHex);
+    }
 
     fishCompanionGroup.visible =
       themeId === 'riverside' ||
