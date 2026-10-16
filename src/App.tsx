@@ -10,7 +10,10 @@ import {
   Flag,
   Gauge,
   LayoutGrid,
+  Pause,
+  Play,
   Sparkles,
+  Square,
   Trophy,
   Upload,
   Zap,
@@ -93,8 +96,7 @@ export default function App() {
     useState<CharacterModelId>(mainCharacterId);
 
   // Screen state machine: 'home' | 'select' | 'stats' | 'preview' | 'character' | 'play' | 'result' | 'over'
-  // Default to 'select' (My Routes Grid Dashboard) so the user immediately sees the grid or can switch to 'home' / 'play'
-  const [screen, setScreen] = useState<ScreenId>('select');
+  const [screen, setScreen] = useState<ScreenId>('home');
   const [statsReturnScreen, setStatsReturnScreen] = useState<'home' | 'select'>(
     'select'
   );
@@ -326,21 +328,12 @@ export default function App() {
       setIsPlaying(false);
       setPlayPhase('ending');
 
-      // Show toast & return to the Dashboard ('select') with the saved coin score!
-      showToast(
-        `Finished '${targetCourse.shortTitle}'! Saved ${earnedScore.toLocaleString()} PTS (${
-          payload.coins
-        } Coins)`
-      );
-
-      // Brief 650ms finish celebration, then return to Dashboard ('select') where the saved score banner & Result modal are visible
+      // Show Result Screen (#screen-result) with earned score, coins, stats, and Return to Home button
       setTimeout(() => {
-        setProgressRatio(0);
-        setCurrentPointIdx(0);
-        setScreen('select');
-      }, 650);
+        setScreen('result');
+      }, 450);
     },
-    [courses, activeCourse, showToast]
+    [courses, activeCourse]
   );
 
   // Global Keyboard Shortcuts from Spec:
@@ -357,9 +350,7 @@ export default function App() {
 
       if (e.code === 'Escape') {
         if (screen === 'play') {
-          setIsPlaying(false);
-          setScreen('select');
-          showToast('Run paused — Returned to My Routes');
+          setIsPlaying((prev) => !prev);
         } else if (
           screen === 'preview' ||
           screen === 'character' ||
@@ -410,9 +401,6 @@ export default function App() {
   const handleQuickLaunchCourse = (course: GpxCourseData) => {
     setRaceCharacterId(mainCharacterId);
     startRaceWithCountdown(course, true);
-    showToast(
-      `Running '${course.shortTitle}' at 2.0x Speed — Collect Coins to Save Score!`
-    );
   };
 
   const handleSeekRatio = useCallback(
@@ -561,14 +549,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeScreenOverlay
           isLoadingRuns={isLoadingRuns}
-          totalSavedCoins={totalSavedCoins}
-          totalSavedScore={totalSavedScore}
           onClickMyRuns={handleClickMyRunsFromHome}
-          onClickMyStats={() => {
-            setStatsReturnScreen('home');
-            setScreen('stats');
-          }}
-          onTriggerUploadGpx={() => fileInputRef.current?.click()}
         />
       )}
 
@@ -642,22 +623,53 @@ export default function App() {
         />
       )}
 
-      {/* 6. PLAY HUD (#hud) — Minimal: ONLY Coins & Map visible while running */}
+      {/* 6. PLAY HUD (#hud) — Coins, Pause/Stop Control & Map visible while running */}
       {screen === 'play' && (
         <div id="hud" className="pointer-events-none">
-          {/* Top-Left Live Coin Counter */}
-          <div className="fixed top-5 left-5 z-20 flex items-center gap-2.5 bg-[#0B0C22]/85 backdrop-blur-md border border-[#FACC15]/45 rounded-2xl px-4 py-2.5 shadow-2xl pointer-events-auto">
-            <Coins className="w-5 h-5 text-[#FACC15]" />
-            <div className="flex items-baseline gap-2 font-mono-tabular">
-              <span className="text-lg font-extrabold text-[#FACC15]">
-                {gameStats.coins}
-              </span>
-              {gameStats.totalCoins > 0 && (
-                <span className="text-xs font-bold text-slate-400">
-                  / {gameStats.totalCoins}
+          {/* Top-Left Live Coin Counter + Pause / Stop Buttons */}
+          <div className="fixed top-5 left-5 z-20 flex items-center gap-2.5 pointer-events-auto">
+            <div className="flex items-center gap-2.5 bg-[#0B0C22]/85 backdrop-blur-md border border-[#FACC15]/45 rounded-2xl px-4 py-2.5 shadow-2xl">
+              <Coins className="w-5 h-5 text-[#FACC15]" />
+              <div className="flex items-baseline gap-2 font-mono-tabular">
+                <span className="text-lg font-extrabold text-[#FACC15]">
+                  {gameStats.coins}
                 </span>
-              )}
+                {gameStats.totalCoins > 0 && (
+                  <span className="text-xs font-bold text-slate-400">
+                    / {gameStats.totalCoins}
+                  </span>
+                )}
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPlaying((p) => !p)}
+              title={isPlaying ? 'Pause Run (Esc)' : 'Resume Run'}
+              className="px-3.5 py-2.5 rounded-2xl bg-[#0B0C22]/85 hover:bg-[#16193A] backdrop-blur-md border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xl transition-colors cursor-pointer"
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-4 h-4 text-[#d1bcd6]" />
+                  <span>Pause</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 text-[#d1bcd6] fill-current" />
+                  <span>Resume</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => runnerActionsRef.current?.finishRunNow()}
+              title="Stop & Finish Run"
+              className="px-3.5 py-2.5 rounded-2xl bg-[#0B0C22]/85 hover:bg-rose-500/25 backdrop-blur-md border border-rose-400/35 text-rose-300 text-xs font-bold flex items-center gap-1.5 shadow-2xl transition-colors cursor-pointer"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span>Stop</span>
+            </button>
           </div>
 
           {/* Top-Right Live Route Map */}
@@ -672,6 +684,72 @@ export default function App() {
               onSeekRatio={handleSeekRatio}
             />
           </div>
+
+          {/* Pause Overlay when Paused during a Run */}
+          {!isPlaying && playPhase === 'running' && (
+            <div className="fixed inset-0 z-30 bg-[#d1bcd6]/80 backdrop-blur-md flex items-center justify-center p-6 pointer-events-auto">
+              <div className="max-w-md w-full bg-[#0E1028]/95 border border-white/15 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-white text-center">
+                <div className="space-y-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#d1bcd6]">
+                    Run Paused · 1.3x Speed
+                  </span>
+                  <h2 className="text-2xl font-extrabold font-display">
+                    {activeCourse.title}
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 font-mono-tabular">
+                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div className="text-[11px] text-slate-400 font-sans">
+                      Current Score
+                    </div>
+                    <div className="text-lg font-extrabold text-[#FACC15] mt-0.5">
+                      {gameStats.score.toLocaleString()} PTS
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div className="text-[11px] text-slate-400 font-sans">
+                      Coins Collected
+                    </div>
+                    <div className="text-lg font-extrabold text-[#d1bcd6] mt-0.5">
+                      {gameStats.coins} / {gameStats.totalCoins}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsPlaying(true)}
+                    className="w-full py-3.5 rounded-2xl bg-[#d1bcd6] hover:bg-[#decce3] text-[#070818] font-extrabold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Resume Running</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => runnerActionsRef.current?.finishRunNow()}
+                    className="w-full py-3.5 rounded-2xl bg-[#FACC15] hover:bg-[#fde047] text-[#070818] font-extrabold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    <span>End Run &amp; View Score</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setScreen('home');
+                    }}
+                    className="w-full py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span>Return to Home</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -683,6 +761,7 @@ export default function App() {
           stats={gameStats}
           record={courseRecords[activeCourse.id]}
           isNewBest={lastRunWasNewBest}
+          onHome={() => setScreen('home')}
           onCourses={() => setScreen('select')}
           onRunAgain={() => startRaceWithCountdown(activeCourse, true)}
         />
@@ -721,8 +800,8 @@ export default function App() {
 
       {/* Drag-and-Drop GPX Overlay */}
       {isDraggingFile && (
-        <div className="fixed inset-0 z-50 bg-[#0B0C22]/85 border-4 border-dashed border-[#76FFB2] flex flex-col items-center justify-center gap-3 pointer-events-none">
-          <Upload className="w-12 h-12 text-[#76FFB2]" />
+        <div className="fixed inset-0 z-50 bg-[#0B0C22]/85 border-4 border-dashed border-[#d1bcd6] flex flex-col items-center justify-center gap-3 pointer-events-none">
+          <Upload className="w-12 h-12 text-[#d1bcd6]" />
           <p className="text-xl font-bold text-white">
             Drop your .GPX file here to generate a Flat 3-Lane Pastel Course
           </p>
@@ -734,8 +813,8 @@ export default function App() {
 
       {/* Toast Notification (hidden during active running so only Map & Coins are visible) */}
       {toastMessage && screen !== 'play' && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-[#11132E] border border-[#76FFB2]/50 text-xs font-medium text-white shadow-2xl flex items-center gap-2 pointer-events-none">
-          <Sparkles className="w-3.5 h-3.5 text-[#76FFB2]" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-[#11132E] border border-[#d1bcd6]/50 text-xs font-medium text-white shadow-2xl flex items-center gap-2 pointer-events-none">
+          <Sparkles className="w-3.5 h-3.5 text-[#d1bcd6]" />
           <span>{toastMessage}</span>
         </div>
       )}

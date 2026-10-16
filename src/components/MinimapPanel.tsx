@@ -259,7 +259,7 @@ export const MinimapPanel: React.FC<MinimapPanelProps> = ({
                 <AdvancedMarker
                   position={{ lat: currentPoint.lat, lng: currentPoint.lng }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-[#76FFB2] border-2 border-white shadow-lg" />
+                  <div className="w-4 h-4 rounded-full bg-[#d1bcd6] border-2 border-white shadow-lg" />
                 </AdvancedMarker>
               </GoogleMap>
             </div>

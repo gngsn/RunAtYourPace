@@ -40,7 +40,7 @@ export const CourseReportModal: React.FC<CourseReportModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div>
-            <div className="text-xs text-[#76FFB2] font-medium">
+            <div className="text-xs text-[#d1bcd6] font-medium">
               GPX Course Report & 1km Split Analytics
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight mt-0.5">
@@ -70,10 +70,10 @@ export const CourseReportModal: React.FC<CourseReportModalProps> = ({
 
           <div className="p-3 rounded-xl bg-white/5 border border-white/10">
             <div className="text-xs text-slate-400 flex items-center gap-1.5">
-              <Timer className="w-3.5 h-3.5 text-[#76FFB2]" />
+              <Timer className="w-3.5 h-3.5 text-[#d1bcd6]" />
               <span>Avg Pace · Time</span>
             </div>
-            <div className="text-xl font-bold font-mono-tabular text-[#76FFB2] mt-1">
+            <div className="text-xl font-bold font-mono-tabular text-[#d1bcd6] mt-1">
               {formatPace(course.avgPaceMinPerKm)}
               <span className="text-xs text-slate-300 font-normal ml-1.5">
                 ({formatDuration(course.totalDurationSeconds)})
@@ -113,7 +113,7 @@ export const CourseReportModal: React.FC<CourseReportModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2.5">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-[#76FFB2]" />
+                <TrendingUp className="w-4 h-4 text-[#d1bcd6]" />
                 1km Splits (Click any row to warp 3D Runner to that split)
               </h3>
               <span className="text-xs text-slate-400">
@@ -157,7 +157,7 @@ export const CourseReportModal: React.FC<CourseReportModalProps> = ({
                         <td className="py-2.5 px-4 font-semibold text-white">
                           {sp.km} km
                         </td>
-                        <td className="py-2.5 px-4 text-[#76FFB2] font-semibold">
+                        <td className="py-2.5 px-4 text-[#d1bcd6] font-semibold">
                           {formatPace(sp.paceMinPerKm)}/km
                         </td>
                         <td className="py-2.5 px-4 w-44">
@@ -216,7 +216,7 @@ export const CourseReportModal: React.FC<CourseReportModalProps> = ({
                       {lm.description}
                     </p>
                   </div>
-                  <span className="text-xs font-mono-tabular text-[#76FFB2] shrink-0">
+                  <span className="text-xs font-mono-tabular text-[#d1bcd6] shrink-0">
                     {lm.distKm.toFixed(1)} km
                   </span>
                 </button>

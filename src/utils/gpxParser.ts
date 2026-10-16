@@ -32,8 +32,8 @@ export const ARTWORK_THEMES: Record<ArtworkThemeId, ArtworkThemeConfig> = {
     skyTopHex: '#07081C',
     skyHorizonHex: '#25265E',
     fogHex: '#1D1E4F',
-    groundPrimaryHex: '#76FFB2',
-    groundSecondaryHex: '#43D996',
+    groundPrimaryHex: '#d1bcd6',
+    groundSecondaryHex: '#b99fc0',
     trackColorHex: '#FFF6FA',
     trackBorderHex: '#FF94C2',
     treeFoliagePrimaryHex: '#FF85B8',
@@ -985,7 +985,7 @@ export const PRESET_COURSES: GpxCourseData[] = [
         heightMeters: 28,
         archStyle: 'dome_pavilion',
         primaryColor: '#FF94C2',
-        accentColor: '#76FFB2',
+        accentColor: '#d1bcd6',
         description:
           'Circular botanical rotunda nestled inside a grove of giant pink wool trees.',
       },
@@ -1339,7 +1339,7 @@ export const PRESET_COURSES: GpxCourseData[] = [
         heightMeters: 30,
         archStyle: 'bridge_arch',
         primaryColor: '#A78BFA',
-        accentColor: '#76FFB2',
+        accentColor: '#d1bcd6',
         description:
           'Historic fortress gate glowing softly against the indigo night sky.',
       },

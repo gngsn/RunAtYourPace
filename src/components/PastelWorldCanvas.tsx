@@ -22,7 +22,7 @@ import { soundEngine } from '../utils/soundEffects';
 export type LaneIndex = -1 | 0 | 1;
 export const LANE_WIDTH = 1.85; // Wide, unmistakable spacing for Lane 1 (-1.85), Lane 2 (0), Lane 3 (+1.85)
 export const POINTS_PER_COIN = 100; // Score is strictly proportional to coins collected (1 Coin = 100 PTS)
-export const FIXED_PLAYBACK_SPEED = 2; // Locked at 2x speed
+export const FIXED_PLAYBACK_SPEED = 1.3; // Locked at 1.3x speed
 
 export interface GameStatsUpdate {
   coins: number;
@@ -685,30 +685,56 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
     };
 
     /**
-     * Densely populates all 3 lanes with continuous coin streaks, diagonal lane-switch waves,
-     * and bonus 5-coin Star Gems so every coin collected directly adds +100 pts to the score.
+     * Populates a single-file, consecutive forward coin trail so the runner can collect
+     * coins continuously as they move forward, with NEVER more than one coin across the 3 lanes
+     * at the same forward progress `t`.
      */
     const generateCourseCollectibles = (curve: THREE.CatmullRomCurve3) => {
       collectibles = [];
-      const lanes: LaneIndex[] = [-1, 0, 1];
       let idCounter = 0;
       let totalCoinValueCount = 0;
 
-      const totalWaves = 52;
-      for (let w = 0; w < totalWaves; w++) {
-        const baseT = 0.012 + (w / totalWaves) * 0.965;
-        const primaryLane = lanes[(w * 5 + 1) % 3];
+      // Start in center lane (0) and step smoothly between adjacent lanes (-1, 0, 1)
+      let currentLane: LaneIndex = 0;
+      let tCursor = 0.018;
+      const coinStepT = 0.0036; // Forward spacing between consecutive coins in a row
+      const waveGapT = 0.011; // Forward gap between consecutive streaks
+      let waveIdx = 0;
 
-        // 5-coin continuous line or diagonal 3-lane staircase in every wave
-        const pattern = w % 4;
-        for (let c = 0; c < 5; c++) {
-          const tCoin = Math.min(0.992, baseT + c * 0.0032);
-          let coinLane: LaneIndex = primaryLane;
-          if (pattern === 1) {
-            coinLane = lanes[c % 3]; // Diagonal Left -> Center -> Right
-          } else if (pattern === 2) {
-            coinLane = lanes[2 - (c % 3)]; // Diagonal Right -> Center -> Left
+      while (tCursor < 0.975) {
+        const streakLen = 5 + (waveIdx % 3); // 5, 6, or 7 coins in a row
+        // Choose whether this streak stays in currentLane or steps 1 adjacent lane
+        const mode = waveIdx % 4;
+        // Pick an adjacent target lane (never jumping -1 <-> 1 directly without 0)
+        let nextTargetLane: LaneIndex = currentLane;
+        if (mode === 1) {
+          nextTargetLane =
+            currentLane === -1 ? 0 : currentLane === 0 ? 1 : 0;
+        } else if (mode === 2) {
+          nextTargetLane =
+            currentLane === 1 ? 0 : currentLane === 0 ? -1 : 0;
+        } else {
+          // Shift to an adjacent lane at the start of the straight streak
+          if (waveIdx > 0) {
+            if (currentLane === 0) {
+              nextTargetLane = waveIdx % 2 === 0 ? -1 : 1;
+            } else {
+              nextTargetLane = 0;
+            }
           }
+          currentLane = nextTargetLane;
+        }
+
+        for (let c = 0; c < streakLen; c++) {
+          if (tCursor >= 0.985) break;
+
+          // Smoothly step to adjacent lane midway through diagonal/curved streaks
+          if ((mode === 1 || mode === 2) && c === Math.floor(streakLen / 2)) {
+            currentLane = nextTargetLane;
+          }
+
+          const tCoin = tCursor;
+          const coinLane: LaneIndex = currentLane;
 
           curve.getPointAt(tCoin, _curvePos);
           curve.getTangentAt(tCoin, _tangent).normalize();
@@ -717,67 +743,67 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
             .clone()
             .addScaledVector(_right, coinLane * LANE_WIDTH);
 
-          const isHighJumpCoin = pattern === 3 && c === 2;
-          const elevOffset = isHighJumpCoin ? 1.35 : 0;
-          cPos.y += 1.05 + elevOffset;
+          const isFinalCoinInStreak = c === streakLen - 1;
+          const isStarFinisher = isFinalCoinInStreak && waveIdx % 3 === 1;
+          const isHighJumpCoin =
+            !isStarFinisher && mode === 3 && c === Math.floor(streakLen / 2);
 
-          collectibles.push({
-            id: idCounter++,
-            t: tCoin,
-            lane: coinLane,
-            type: 'coin',
-            coinValue: 1,
-            elevOffset,
-            worldPos: cPos,
-            tangentAngle: Math.atan2(_tangent.x, _tangent.z),
-            collected: false,
-          });
-          totalCoinValueCount += 1;
-
-          // Place a soft cloud hurdle under the high-jump coin
-          if (isHighJumpCoin) {
-            const hPos = _curvePos
-              .clone()
-              .addScaledVector(_right, coinLane * LANE_WIDTH);
-            hPos.y += 0.58;
+          if (isStarFinisher) {
+            // Single-file Star Coin at the end of the streak (never parallel in another lane)
+            cPos.y += 1.18;
             collectibles.push({
               id: idCounter++,
               t: tCoin,
               lane: coinLane,
-              type: 'cloud_hurdle',
-              coinValue: 0,
-              elevOffset: 0,
-              worldPos: hPos,
+              type: 'star_coin',
+              coinValue: 5,
+              elevOffset: 0.2,
+              worldPos: cPos,
               tangentAngle: Math.atan2(_tangent.x, _tangent.z),
               collected: false,
             });
+            totalCoinValueCount += 5;
+          } else {
+            const elevOffset = isHighJumpCoin ? 1.35 : 0;
+            cPos.y += 1.05 + elevOffset;
+
+            collectibles.push({
+              id: idCounter++,
+              t: tCoin,
+              lane: coinLane,
+              type: 'coin',
+              coinValue: 1,
+              elevOffset,
+              worldPos: cPos,
+              tangentAngle: Math.atan2(_tangent.x, _tangent.z),
+              collected: false,
+            });
+            totalCoinValueCount += 1;
+
+            if (isHighJumpCoin) {
+              const hPos = _curvePos
+                .clone()
+                .addScaledVector(_right, coinLane * LANE_WIDTH);
+              hPos.y += 0.58;
+              collectibles.push({
+                id: idCounter++,
+                t: tCoin,
+                lane: coinLane,
+                type: 'cloud_hurdle',
+                coinValue: 0,
+                elevOffset: 0,
+                worldPos: hPos,
+                tangentAngle: Math.atan2(_tangent.x, _tangent.z),
+                collected: false,
+              });
+            }
           }
+
+          tCursor += coinStepT;
         }
 
-        // Every 3rd wave, place a Big Star Coin (+5 Coins = +500 PTS + Magnet Fever) in an adjacent lane!
-        if (w % 3 === 1) {
-          const starLane = lanes[(w + 2) % 3];
-          const tStar = Math.min(0.994, baseT + 0.015);
-          curve.getPointAt(tStar, _curvePos);
-          curve.getTangentAt(tStar, _tangent).normalize();
-          _right.crossVectors(_tangent, _up).normalize();
-          const sPos = _curvePos
-            .clone()
-            .addScaledVector(_right, starLane * LANE_WIDTH);
-          sPos.y += 1.18;
-          collectibles.push({
-            id: idCounter++,
-            t: tStar,
-            lane: starLane,
-            type: 'star_coin',
-            coinValue: 5,
-            elevOffset: 0.2,
-            worldPos: sPos,
-            tangentAngle: Math.atan2(_tangent.x, _tangent.z),
-            collected: false,
-          });
-          totalCoinValueCount += 5;
-        }
+        tCursor += waveGapT;
+        waveIdx++;
       }
 
       stateRef.current.totalCoins = totalCoinValueCount;
@@ -1459,7 +1485,7 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
       stateRef.current.carriedItems = ['Magnet Fever', 'Coin Surge +3'];
       stateRef.current.hasCompletedCurrentRun = false;
       stateRef.current.lastEventLabel =
-        'Run Started at 2.0x Speed! Collect Coins to Score (1 Coin = 100 PTS)';
+        'Run Started at 1.3x Speed! Collect Coins to Score (1 Coin = 100 PTS)';
       emitGameStats();
     };
 
@@ -1955,12 +1981,13 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
         );
 
         const mode = st.cameraMode;
-        const isWide = container.clientWidth >= 768;
+        const isWide = container.clientWidth >= 640;
 
         if (mode === 'portrait') {
           // Portrait camera (Home / My Routes / My Stats):
-          // On wide screens the camera pans so the character stands on the right
-          const sidePan = isWide ? -1.85 : 0;
+          // Since camera faces -_smoothedTangent, camera-right is -_right.
+          // Positive sidePan along +_right shifts camera left, placing the character on the RIGHT of the screen!
+          const sidePan = isWide ? 1.85 : 0;
           _camDesiredPos
             .copy(runnerRig.root.position)
             .addScaledVector(_smoothedTangent, 5.2)
@@ -1972,18 +1999,23 @@ export const PastelWorldCanvas: React.FC<PastelWorldCanvasProps> = ({
             .addScaledVector(_right, sidePan);
           _camDesiredLook.y = runnerRig.root.position.y + 1.55;
         } else if (mode === 'portrait_char_select') {
-          // Character screen: On wide screens the camera pans 2.3 units sideways so the character stands left of the panel
-          const sidePan = isWide ? 2.3 : 0;
+          // Character screen: Selection window is on the right (or bottom on mobile).
+          // Negative sidePan (-2.3 along _right) shifts the camera to camera-right,
+          // placing the 3D character clearly on the LEFT half of the screen!
+          const sidePan = isWide ? -2.3 : 0;
+          const mobileVerticalOffset = isWide ? 0 : -1.15;
           _camDesiredPos
             .copy(runnerRig.root.position)
-            .addScaledVector(_smoothedTangent, 5.4)
+            .addScaledVector(_smoothedTangent, isWide ? 5.2 : 6.2)
             .addScaledVector(_right, sidePan);
-          _camDesiredPos.y = runnerRig.root.position.y + 2.35;
+          _camDesiredPos.y =
+            runnerRig.root.position.y + 2.35 + mobileVerticalOffset * 0.4;
 
           _camDesiredLook
             .copy(runnerRig.root.position)
             .addScaledVector(_right, sidePan);
-          _camDesiredLook.y = runnerRig.root.position.y + 1.55;
+          _camDesiredLook.y =
+            runnerRig.root.position.y + 1.55 + mobileVerticalOffset;
         } else if (mode === 'overview') {
           // Preview screen: High overview of the route
           _camDesiredPos

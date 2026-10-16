@@ -522,30 +522,86 @@ export function createFeltRunnerRig(
 
   const CHAR_OUTFITS: Record<
     CharacterModelId,
-    { sweater: string; pants: string; hat: string }
+    {
+      skin: string;
+      sweater: string;
+      collar: string;
+      pants: string;
+      shoe: string;
+      hat: string;
+    }
   > = {
-    hoodie_kid: { sweater: '#FEF08A', pants: '#93C5FD', hat: '#FDE047' },
-    flower_orb: { sweater: '#FBCFE8', pants: '#A7F3D0', hat: '#FF85B8' },
-    topknot_kid: { sweater: '#DDD6FE', pants: '#FDE68A', hat: '#C4B5FD' },
-    mint_sprinter: { sweater: '#6EE7B7', pants: '#38BDF8', hat: '#34D399' },
-    starlight_fox: { sweater: '#FED7AA', pants: '#C4B5FD', hat: '#FB923C' },
+    // 1. Mint (Image 1: Teal head/limbs, beige bucket hat, peach-coral tunic, coral boots)
+    mint_sprinter: {
+      skin: '#0FB5BA',
+      sweater: '#F5A66B',
+      collar: '#EC7E6D',
+      pants: '#0FB5BA',
+      shoe: '#EC836D',
+      hat: '#EED09D',
+    },
+    // 2. Bloom (Image 2: Aqua-lavender-pink orb, sprouting flower, pink limbs, pink-aqua boots)
+    flower_orb: {
+      skin: '#5BE2D8',
+      sweater: '#F86CC8',
+      collar: '#5BE2D8',
+      pants: '#FCA5E0',
+      shoe: '#E87AD8',
+      hat: '#F779E6',
+    },
+    // 3. Momo (Image 3: Cream-to-aqua head, pink romper, teal limbs, pink boots)
+    topknot_kid: {
+      skin: '#BEE3C8',
+      sweater: '#F39CE0',
+      collar: '#F497DA',
+      pants: '#1FC8B5',
+      shoe: '#EE99E2',
+      hat: '#EDE8B8',
+    },
+    // 4. Sunny (Image 4: Pink face, cozy yellow-to-aqua hoodie, pink legs, aqua boots)
+    hoodie_kid: {
+      skin: '#F5B1B3',
+      sweater: '#FCE192',
+      collar: '#18C5C4',
+      pants: '#F5B1B3',
+      shoe: '#18C5C4',
+      hat: '#FCE192',
+    },
+    // 5. Coco (Image 5: Warm peach head, X-eyes, teal romper, pink limbs, coral shoes)
+    starlight_fox: {
+      skin: '#F5B882',
+      sweater: '#0FB8B9',
+      collar: '#10B8B9',
+      pants: '#F5B1B3',
+      shoe: '#EF8A6B',
+      hat: '#F6D48F',
+    },
   };
 
   const setCharacterModel = (modelId: CharacterModelId) => {
     currentCharId = modelId;
-    hatGroup.visible = modelId === 'hoodie_kid';
+    // Both hoodie_kid (Sunny) and mint_sprinter (Mint) wear the rounded dome hat/hood
+    hatGroup.visible = modelId === 'hoodie_kid' || modelId === 'mint_sprinter';
     flowerCrownGroup.visible = modelId === 'flower_orb';
-    topknotGroup.visible = modelId === 'topknot_kid';
-    mintVisorGroup.visible = modelId === 'mint_sprinter';
-    foxEarsGroup.visible = modelId === 'starlight_fox';
+    topknotGroup.visible =
+      modelId === 'topknot_kid' || modelId === 'starlight_fox';
+    mintVisorGroup.visible = false;
+    foxEarsGroup.visible = false;
 
     const outfit = CHAR_OUTFITS[modelId] || CHAR_OUTFITS.hoodie_kid;
+    skinMat.color.set(outfit.skin);
     sweaterMat.color.set(outfit.sweater);
     sweaterMat.emissive.set(outfit.sweater);
+    collarMat.color.set(outfit.collar);
+    collarMat.emissive.set(outfit.collar);
     pantsMat.color.set(outfit.pants);
     pantsMat.emissive.set(outfit.pants);
+    shoeMat.color.set(outfit.shoe);
+    shoeMat.emissive.set(outfit.shoe);
     hatMat.color.set(outfit.hat);
     hatMat.emissive.set(outfit.hat);
+    bunMat.color.set(outfit.hat);
+    bunMat.emissive.set(outfit.hat);
   };
 
   const updateThemeStyle = (

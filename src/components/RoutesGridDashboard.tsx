@@ -23,6 +23,7 @@ import {
 } from '../types/gpx';
 import { ARTWORK_THEMES, formatPace } from '../utils/gpxParser';
 import { GameStatsUpdate, POINTS_PER_COIN } from './PastelWorldCanvas';
+import { Character3DThumbnail, FIVE_CHARACTERS } from './PaceRunnerScreens';
 
 export interface CompletedRunSummary {
   courseId: string;
@@ -263,18 +264,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
   onOpenStats,
   onOpenHome,
 }) => {
-  const [selectedTab, setSelectedTab] = useState<FilterTabId>('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  const categoryCounts = useMemo(() => {
-    return {
-      all: courses.length,
-      waterfront: courses.filter((c) => c.category === 'waterfront').length,
-      forest: courses.filter((c) => c.category === 'forest').length,
-      elevation: courses.filter((c) => c.category === 'elevation').length,
-      custom: courses.filter((c) => c.category === 'custom').length,
-    };
-  }, [courses]);
 
   const totalSavedStats = useMemo(() => {
     const records = Object.values(courseRecords);
@@ -289,91 +279,92 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
     };
   }, [courseRecords]);
 
+  // Sort courses by newest first (most recently completed or newest added first)
   const filteredCourses = useMemo(() => {
-    return courses.filter((c) => {
-      const matchesTab =
-        selectedTab === 'all' ? true : c.category === selectedTab;
-      const q = searchQuery.trim().toLowerCase();
-      const matchesQuery =
+    const q = searchQuery.trim().toLowerCase();
+    const matching = courses.filter((c) => {
+      return (
         !q ||
         c.title.toLowerCase().includes(q) ||
         c.shortTitle.toLowerCase().includes(q) ||
         c.locationLabel.toLowerCase().includes(q) ||
         c.subtitle.toLowerCase().includes(q) ||
-        c.landmarks.some((lm) => lm.name.toLowerCase().includes(q));
-      return matchesTab && matchesQuery;
+        c.landmarks.some((lm) => lm.name.toLowerCase().includes(q))
+      );
     });
-  }, [courses, selectedTab, searchQuery]);
 
-  const tabs: Array<{ id: FilterTabId; label: string; count: number }> = [
-    { id: 'all', label: 'For You', count: categoryCounts.all },
-    { id: 'waterfront', label: 'Waterfront', count: categoryCounts.waterfront },
-    { id: 'forest', label: 'Forest & Park', count: categoryCounts.forest },
-    { id: 'elevation', label: 'Night Run', count: categoryCounts.elevation },
-    ...(categoryCounts.custom > 0
-      ? [
-          {
-            id: 'custom' as FilterTabId,
-            label: 'Custom GPX',
-            count: categoryCounts.custom,
-          },
-        ]
-      : []),
-  ];
+    return [...matching].sort((a, b) => {
+      const recA = courseRecords[a.id]?.lastCompletedAtIso
+        ? Date.parse(courseRecords[a.id].lastCompletedAtIso)
+        : 0;
+      const recB = courseRecords[b.id]?.lastCompletedAtIso
+        ? Date.parse(courseRecords[b.id].lastCompletedAtIso)
+        : 0;
+      if (recB !== recA) return recB - recA;
+
+      const timeA = a.points[0]?.timeIso ? Date.parse(a.points[0].timeIso) : 0;
+      const timeB = b.points[0]?.timeIso ? Date.parse(b.points[0].timeIso) : 0;
+      if (timeB !== timeA) return timeB - timeA;
+
+      return courses.indexOf(a) - courses.indexOf(b);
+    });
+  }, [courses, courseRecords, searchQuery]);
 
   return (
     <section
       id="screen-select"
-      className="fixed inset-0 z-30 bg-[#050611]/92 backdrop-blur-xl overflow-y-auto text-white select-none"
+      className="fixed inset-0 z-30 bg-[#ebd7f0] overflow-y-auto text-[#1E1B4B] select-none"
+      style={{ backgroundColor: '#ebd7f0' }}
     >
-      {/* Subtle Ambient Background Aura */}
-      <div
-        className="pointer-events-none fixed inset-0 opacity-30"
-        style={{
-          background:
-            'radial-gradient(circle at 20% 15%, rgba(122, 142, 245, 0.28), transparent 45%), radial-gradient(circle at 80% 75%, rgba(230, 138, 184, 0.22), transparent 50%)',
-        }}
-      />
-
-      <div className="relative max-w-5xl mx-auto px-5 sm:px-8 pt-6 pb-20 space-y-7">
-        {/* Top Pill Bar (Inspired directly by the reference image's top avatar + prompt bar + menu button) */}
+      <div className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-6 pb-20 space-y-7">
+        {/* Top Bar with 'Run At Your pace' Brand + Search + Quick Actions */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Search / Route Prompt Pill */}
-          <div className="flex-1 min-w-[260px] max-w-xl flex items-center gap-3.5 bg-[#121428]/90 border border-white/12 rounded-full p-2 pr-4 shadow-2xl">
-            {/* Glowing Felt Avatar Orb (Click to return to Home Screen) */}
+          {/* Brand Title + Search Pill */}
+          <div className="flex flex-wrap items-center gap-4 flex-1 min-w-[280px]">
             <button
               type="button"
               onClick={onOpenHome}
-              title="Pace Runner Home"
-              className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center shadow-inner border border-white/30 cursor-pointer hover:scale-105 transition-transform"
-              style={{
-                background:
-                  'radial-gradient(circle at 35% 30%, #FF94C2, #5B8EF4 70%, #1E1B4B)',
-              }}
+              title="Run At Your pace — Home"
+              className="flex items-center gap-3 text-left group cursor-pointer shrink-0"
             >
-              <Sparkles className="w-5 h-5 text-white" />
+              <div
+                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center shadow-md border border-white/60 group-hover:scale-105 transition-transform"
+                style={{
+                  background:
+                    'radial-gradient(circle at 35% 30%, #FF94C2, #5B8EF4 70%, #1E1B4B)',
+                }}
+              >
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="text-lg sm:text-xl font-extrabold font-display tracking-tight text-[#1E1B4B] leading-tight">
+                  Run At Your pace
+                </div>
+                <div className="text-[11px] text-[#4C3B63] font-medium">
+                  The route you ran becomes the course
+                </div>
+              </div>
             </button>
 
-            <div className="flex-1 flex items-center gap-2 min-w-0">
+            <div className="flex-1 min-w-[220px] max-w-md flex items-center gap-2.5 bg-[#121428]/90 border border-white/15 rounded-full px-4 py-2.5 shadow-xl text-white">
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search My Routes (non-overlapping 3-lane GPX courses)..."
+                placeholder="Search My Routes..."
                 className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-xs text-slate-400 hover:text-white"
-              >
-                Clear
-              </button>
-            )}
           </div>
 
           {/* Right Quick Actions: My Stats, Import GPX & Return to Live 3D World */}
@@ -401,7 +392,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
             <button
               type="button"
               onClick={onReturnTo3DWorld}
-              className="px-5 py-3 rounded-full bg-[#76FFB2] hover:bg-[#93ffbe] text-[#070818] text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+              className="px-5 py-3 rounded-full bg-[#d1bcd6] hover:bg-[#decce3] text-[#070818] text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Start / Resume 3D Run</span>
@@ -411,14 +402,14 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
 
         {/* Celebratory Banner when Returning to Dashboard After Completing a Run */}
         {lastCompletedSummary && (
-          <div className="relative rounded-3xl p-5 bg-gradient-to-r from-[#1A1D42] via-[#231B49] to-[#16273E] border-2 border-[#FACC15]/70 shadow-[0_0_40px_rgba(250,204,21,0.22)] flex flex-wrap items-center justify-between gap-4">
+          <div className="relative rounded-3xl p-5 bg-gradient-to-r from-[#1A1D42] via-[#231B49] to-[#16273E] border-2 border-[#FACC15]/70 shadow-[0_0_40px_rgba(250,204,21,0.22)] flex flex-wrap items-center justify-between gap-4 text-white">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-[#FACC15]/20 border border-[#FACC15]/50 flex items-center justify-center shrink-0">
                 <Trophy className="w-6 h-6 text-[#FACC15]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#76FFB2]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#d1bcd6]">
                     Course Completed · Score Saved!
                   </span>
                   {lastCompletedSummary.isNewBest && (
@@ -431,7 +422,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                   {lastCompletedSummary.courseTitle}
                 </h2>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  You finished the entire route at 2.0x speed and saved your coin score to the dashboard!
+                  You finished the entire route at 1.3x speed and saved your coin score to the dashboard!
                 </p>
               </div>
             </div>
@@ -443,7 +434,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                   <Coins className="w-4 h-4" />
                   <span>{lastCompletedSummary.score.toLocaleString()} PTS</span>
                 </div>
-                <div className="text-[11px] text-[#76FFB2]">
+                <div className="text-[11px] text-[#d1bcd6]">
                   {lastCompletedSummary.coins}
                   {lastCompletedSummary.totalCoins > 0
                     ? ` / ${lastCompletedSummary.totalCoins}`
@@ -455,7 +446,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
               <button
                 type="button"
                 onClick={onReturnTo3DWorld}
-                className="px-4 py-2.5 rounded-2xl bg-[#76FFB2] hover:bg-[#93ffbe] text-[#070818] text-xs font-extrabold flex items-center gap-1.5 transition-colors shadow-md cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl bg-[#d1bcd6] hover:bg-[#decce3] text-[#070818] text-xs font-extrabold flex items-center gap-1.5 transition-colors shadow-md cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Run Again</span>
@@ -473,261 +464,274 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
           </div>
         )}
 
-        {/* Runner Customization & Saved Coin Score Telemetry Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-[#101226]/80 border border-white/10 rounded-3xl px-5 py-3.5">
-          {/* Character Style Selector */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1">
-              <User className="w-3.5 h-3.5 text-[#FF85B8]" />
-              <span>Runner Style:</span>
-            </span>
-            {CHARACTER_OPTIONS.map((char) => {
-              const active = characterId === char.id;
-              return (
-                <button
-                  key={char.id}
-                  type="button"
-                  onClick={() => onChangeCharacter(char.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
-                    active
-                      ? 'bg-white text-[#070818] font-semibold shadow-sm'
-                      : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: char.badgeColor }}
-                  />
-                  <span>{char.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* World Atmosphere Theme Selector */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-slate-400 mr-1">Atmosphere:</span>
-            {(Object.keys(ARTWORK_THEMES) as ArtworkThemeId[]).map((tId) => {
-              const tCfg = ARTWORK_THEMES[tId];
-              const active = themeId === tId;
-              return (
-                <button
-                  key={tId}
-                  type="button"
-                  onClick={() => onChangeTheme(tId)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
-                    active
-                      ? 'bg-white text-[#070818] font-semibold shadow-sm'
-                      : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: tCfg.treeFoliagePrimaryHex }}
-                  />
-                  <span>{tCfg.nameEn}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Saved Total Score & Coins Across Completed Runs */}
-          <div className="flex items-center gap-3 text-xs font-mono-tabular">
-            <span className="flex items-center gap-1 text-[#FACC15] font-bold">
-              <Coins className="w-3.5 h-3.5" />
-              {totalSavedStats.totalBestCoins > 0
-                ? `${totalSavedStats.totalBestCoins} Saved Coins`
-                : `${gameStats.coins} Coins`}
-            </span>
-            <span className="text-slate-600">·</span>
-            <span className="flex items-center gap-1 text-[#76FFB2] font-bold">
-              <Trophy className="w-3.5 h-3.5" />
-              {totalSavedStats.totalBestScore > 0
-                ? `${totalSavedStats.totalBestScore.toLocaleString()} Total PTS`
-                : `${gameStats.score.toLocaleString()} PTS`}
-            </span>
-          </div>
-        </div>
-
-        {/* Category Filter Tabs with Superscript Numbers (Exact Editorial Match to Reference Image) */}
-        <div className="flex items-baseline gap-7 sm:gap-9 overflow-x-auto pb-1 border-b border-white/10">
-          {tabs.map((tab) => {
-            const isActive = selectedTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setSelectedTab(tab.id)}
-                className={`pb-3 transition-colors whitespace-nowrap flex items-start gap-1 border-b-2 ${
-                  isActive
-                    ? 'text-white font-semibold border-white'
-                    : 'text-slate-500 hover:text-slate-300 font-normal border-transparent'
-                }`}
-              >
-                <span className="text-2xl sm:text-[26px] tracking-tight font-display">
-                  {tab.label}
+        {/* Main Two-Column Layout: Left Settings Sidebar + Right Newest-First Routes Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[265px_1fr] gap-7 items-start">
+          {/* Left Settings Sidebar (Theme Switcher + Runner Style + Saved Score Summary) */}
+          <aside className="bg-[#101226]/92 border border-white/15 rounded-3xl p-5 space-y-6 lg:sticky lg:top-6 shadow-2xl text-white">
+            {/* 1. Theme Settings */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#d1bcd6]" />
+                  <span>Settings · Theme</span>
                 </span>
-                <sup className="text-xs font-mono-tabular mt-1 opacity-80">
-                  {tab.count}
-                </sup>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              <div className="space-y-2">
+                {(Object.keys(ARTWORK_THEMES) as ArtworkThemeId[]).map((tId) => {
+                  const tCfg = ARTWORK_THEMES[tId];
+                  const active = themeId === tId;
+                  return (
+                    <button
+                      key={tId}
+                      type="button"
+                      onClick={() => onChangeTheme(tId)}
+                      className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-medium transition-all flex items-center justify-between gap-2 cursor-pointer border ${
+                        active
+                          ? 'bg-white text-[#070818] font-bold border-white shadow-md'
+                          : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/20"
+                          style={{
+                            background: `linear-gradient(135deg, ${tCfg.treeFoliagePrimaryHex}, ${tCfg.groundPrimaryHex})`,
+                          }}
+                        />
+                        <span className="truncate">{tCfg.nameEn}</span>
+                      </div>
+                      {active && <Check className="w-3.5 h-3.5 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* Squircle Pastel Aura Route Cards Grid (2 Columns on Mobile/Tablet, 3 Columns on Desktop) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {filteredCourses.map((course) => {
-            const isSelected = course.id === activeCourse.id;
-            const record = courseRecords[course.id];
-            const durationMins = Math.max(
-              1,
-              Math.round(course.totalDurationSeconds / 60)
-            );
-
-            return (
-              <div
-                key={course.id}
-                onClick={() =>
-                  onPreviewCourse
-                    ? onPreviewCourse(course)
-                    : onSelectAndLaunchCourse(course)
-                }
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    if (onPreviewCourse) {
-                      onPreviewCourse(course);
-                    } else {
-                      onSelectAndLaunchCourse(course);
-                    }
-                  }
-                }}
-                className={`group relative rounded-[38px] p-6 flex flex-col items-center justify-between min-h-[355px] cursor-pointer transition-all duration-300 overflow-hidden ${
-                  isSelected
-                    ? 'ring-3 ring-white shadow-[0_0_45px_rgba(255,255,255,0.22)] -translate-y-1'
-                    : 'hover:-translate-y-1.5 hover:shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
-                }`}
-                style={{
-                  background: `radial-gradient(circle at 50% 54%, ${course.cardAura.innerGlow} 0%, ${course.cardAura.outerBg} 74%)`,
-                  boxShadow: `inset 0 1px 2px ${course.cardAura.rimHighlight}, inset 0 -10px 28px rgba(15, 23, 42, 0.18)`,
-                }}
-              >
-                {/* Top Row: Active / Completed Score Badge & Report Quick Action */}
-                <div className="w-full flex items-center justify-between gap-2 z-10">
-                  {record ? (
-                    <span className="px-2.5 py-1 rounded-full bg-black/35 backdrop-blur-md text-[11px] font-bold text-[#FACC15] flex items-center gap-1 border border-[#FACC15]/40">
-                      <Trophy className="w-3 h-3 text-[#FACC15]" />
-                      <span>
-                        Best {record.bestScore.toLocaleString()} PTS ·{' '}
-                        {record.bestCoins} Coins
+            {/* 2. Runner Style Picker (Grid with Short Nicknames) */}
+            <div className="pt-4 border-t border-white/10 space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-[#FF85B8]" />
+                <span>Main Runner</span>
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {FIVE_CHARACTERS.map((char) => {
+                  const active = characterId === char.id;
+                  return (
+                    <button
+                      key={char.id}
+                      type="button"
+                      onClick={() => onChangeCharacter(char.id)}
+                      className={`p-2 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                        active
+                          ? 'bg-white/15 border-[#d1bcd6] ring-1 ring-[#d1bcd6]/50 shadow-md'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <Character3DThumbnail char={char} size={42} />
+                      <span className="text-[11px] font-extrabold text-white truncate">
+                        {char.name}
                       </span>
-                    </span>
-                  ) : isSelected ? (
-                    <span className="px-2.5 py-0.5 rounded-full bg-black/25 backdrop-blur-md text-[11px] font-semibold text-white flex items-center gap-1 border border-white/30">
-                      <Check className="w-3 h-3 text-[#76FFB2]" />
-                      <span>Active Route</span>
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-medium text-white/95">
-                      {course.totalDistanceKm.toFixed(1)} km · 2.0x
-                    </span>
-                  )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onInspectCourseReport(course);
+            {/* 3. Saved Total Score & Coins */}
+            <div className="pt-4 border-t border-white/10 space-y-2 text-xs font-mono-tabular">
+              <div className="flex items-center justify-between text-[#FACC15] font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>Saved Coins</span>
+                </span>
+                <span>
+                  {totalSavedStats.totalBestCoins > 0
+                    ? totalSavedStats.totalBestCoins
+                    : gameStats.coins}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[#d1bcd6] font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Total Score</span>
+                </span>
+                <span>
+                  {(totalSavedStats.totalBestScore > 0
+                    ? totalSavedStats.totalBestScore
+                    : gameStats.score
+                  ).toLocaleString()}{' '}
+                  PTS
+                </span>
+              </div>
+            </div>
+          </aside>
+
+          {/* Right Column: Newest-First Routes Grid (Category tabs removed) */}
+          <div className="space-y-4 min-w-0">
+            <div className="flex items-center justify-between pb-2 border-b border-[#1E1B4B]/15">
+              <h2 className="text-xl sm:text-2xl font-extrabold font-display tracking-tight text-[#1E1B4B]">
+                My Routes
+              </h2>
+              <span className="text-xs font-mono-tabular font-semibold text-[#4C3B63]">
+                Sorted by Newest · {filteredCourses.length} Routes
+              </span>
+            </div>
+
+            {/* Squircle Pastel Aura Route Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
+              {filteredCourses.map((course) => {
+                const isSelected = course.id === activeCourse.id;
+                const record = courseRecords[course.id];
+                const durationMins = Math.max(
+                  1,
+                  Math.round(course.totalDurationSeconds / 60)
+                );
+
+                return (
+                  <div
+                    key={course.id}
+                    onClick={() =>
+                      onPreviewCourse
+                        ? onPreviewCourse(course)
+                        : onSelectAndLaunchCourse(course)
+                    }
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (onPreviewCourse) {
+                          onPreviewCourse(course);
+                        } else {
+                          onSelectAndLaunchCourse(course);
+                        }
+                      }
                     }}
-                    className="p-2 rounded-full bg-black/20 hover:bg-black/35 text-white/90 hover:text-white transition-colors backdrop-blur-md"
-                    title="Inspect 1km Splits & 3D Landmarks"
+                    className={`group relative rounded-[38px] p-6 flex flex-col items-center justify-between min-h-[355px] cursor-pointer transition-all duration-300 overflow-hidden ${
+                      isSelected
+                        ? 'ring-3 ring-white shadow-[0_0_45px_rgba(255,255,255,0.22)] -translate-y-1'
+                        : 'hover:-translate-y-1.5 hover:shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
+                    }`}
+                    style={{
+                      background: `radial-gradient(circle at 50% 54%, ${course.cardAura.innerGlow} 0%, ${course.cardAura.outerBg} 74%)`,
+                      boxShadow: `inset 0 1px 2px ${course.cardAura.rimHighlight}, inset 0 -10px 28px rgba(15, 23, 42, 0.18)`,
+                    }}
                   >
-                    <BarChart3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                    {/* Top Row: Active / Completed Score Badge & Report Quick Action */}
+                    <div className="w-full flex items-center justify-between gap-2 z-10">
+                      {record ? (
+                        <span className="px-2.5 py-1 rounded-full bg-black/35 backdrop-blur-md text-[11px] font-bold text-[#FACC15] flex items-center gap-1 border border-[#FACC15]/40">
+                          <Trophy className="w-3 h-3 text-[#FACC15]" />
+                          <span>
+                            Best {record.bestScore.toLocaleString()} PTS ·{' '}
+                            {record.bestCoins} Coins
+                          </span>
+                        </span>
+                      ) : isSelected ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-black/25 backdrop-blur-md text-[11px] font-semibold text-white flex items-center gap-1 border border-white/30">
+                          <Check className="w-3 h-3 text-[#d1bcd6]" />
+                          <span>Active Route</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-medium text-white/95">
+                          {course.totalDistanceKm.toFixed(1)} km · 1.3x
+                        </span>
+                      )}
 
-                {/* Top-Centered Editorial Title & Duration Subtitle */}
-                <div className="text-center mt-1 z-10">
-                  <h3 className="text-lg sm:text-xl font-semibold text-white tracking-tight drop-shadow-sm">
-                    {course.shortTitle}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-white/85 font-medium mt-0.5">
-                    {durationMins} min · {formatPace(course.avgPaceMinPerKm)}/km · 3 Lanes
-                  </p>
-                </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInspectCourseReport(course);
+                        }}
+                        className="p-2 rounded-full bg-black/20 hover:bg-black/35 text-white/90 hover:text-white transition-colors backdrop-blur-md"
+                        title="Inspect 1km Splits & 3D Landmarks"
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-                {/* Centerpiece: 3D Frosted Glass Tubular Non-Overlapping GPX Route Sculpture */}
-                <div className="my-1 flex items-center justify-center z-10">
-                  <FrostedGpxTubeSculpture
-                    course={course}
-                    isActive={isSelected}
-                  />
-                </div>
+                    {/* Top-Centered Editorial Title & Duration Subtitle */}
+                    <div className="text-center mt-1 z-10">
+                      <h3 className="text-lg sm:text-xl font-semibold text-white tracking-tight drop-shadow-sm">
+                        {course.shortTitle}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-white/85 font-medium mt-0.5">
+                        {durationMins} min · {formatPace(course.avgPaceMinPerKm)}/km · 3 Lanes
+                      </p>
+                    </div>
 
-                {/* Bottom Subtle Course Location & Saved Coin Record Footer */}
-                <div className="w-full pt-2 border-t border-white/20 flex items-center justify-between gap-2 text-xs text-white/95 z-10">
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate">{course.title}</div>
-                    <div className="text-[11px] text-white/75 flex items-center gap-1 truncate">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{course.locationLabel}</span>
+                    {/* Centerpiece: 3D Frosted Glass Tubular Non-Overlapping GPX Route Sculpture */}
+                    <div className="my-1 flex items-center justify-center z-10">
+                      <FrostedGpxTubeSculpture
+                        course={course}
+                        isActive={isSelected}
+                      />
+                    </div>
+
+                    {/* Bottom Subtle Course Location & Saved Coin Record Footer */}
+                    <div className="w-full pt-2 border-t border-white/20 flex items-center justify-between gap-2 text-xs text-white/95 z-10">
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{course.title}</div>
+                        <div className="text-[11px] text-white/75 flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{course.locationLabel}</span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-2">
+                        {record ? (
+                          <span className="text-[11px] font-mono-tabular font-semibold bg-black/30 text-[#d1bcd6] px-2.5 py-1 rounded-full flex items-center gap-1 border border-[#d1bcd6]/30">
+                            <Award className="w-3 h-3" />
+                            <span>{record.completedRuns}× Clear</span>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-mono-tabular bg-black/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <Layers className="w-3 h-3" />
+                            <span>Flat 0m</span>
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectAndLaunchCourse(course);
+                          }}
+                          title="Quick Launch 3D Run"
+                          className="w-8 h-8 rounded-full bg-white text-[#0B0C22] flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                );
+              })}
 
-                  <div className="shrink-0 flex items-center gap-2">
-                    {record ? (
-                      <span className="text-[11px] font-mono-tabular font-semibold bg-black/30 text-[#76FFB2] px-2.5 py-1 rounded-full flex items-center gap-1 border border-[#76FFB2]/30">
-                        <Award className="w-3 h-3" />
-                        <span>{record.completedRuns}× Clear</span>
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-mono-tabular bg-black/20 px-2.5 py-1 rounded-full flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        <span>Flat 0m</span>
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectAndLaunchCourse(course);
-                      }}
-                      title="Quick Launch 3D Run"
-                      className="w-8 h-8 rounded-full bg-white text-[#0B0C22] flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                    </button>
-                  </div>
+              {/* Upload Custom GPX Squircle Card */}
+              <button
+                type="button"
+                onClick={onTriggerUploadGpx}
+                className="group relative rounded-[38px] p-6 flex flex-col items-center justify-center gap-4 min-h-[355px] border-2 border-dashed border-white/20 hover:border-[#FF85B8] bg-[#10132A]/60 hover:bg-[#151936]/80 transition-all duration-300 text-center"
+              >
+                <div className="w-16 h-16 rounded-3xl bg-white/10 group-hover:bg-[#FF85B8]/20 flex items-center justify-center transition-colors">
+                  <Upload className="w-7 h-7 text-[#FF85B8]" />
                 </div>
-              </div>
-            );
-          })}
-
-          {/* Upload Custom GPX Squircle Card */}
-          <button
-            type="button"
-            onClick={onTriggerUploadGpx}
-            className="group relative rounded-[38px] p-6 flex flex-col items-center justify-center gap-4 min-h-[355px] border-2 border-dashed border-white/20 hover:border-[#FF85B8] bg-[#10132A]/60 hover:bg-[#151936]/80 transition-all duration-300 text-center"
-          >
-            <div className="w-16 h-16 rounded-3xl bg-white/10 group-hover:bg-[#FF85B8]/20 flex items-center justify-center transition-colors">
-              <Upload className="w-7 h-7 text-[#FF85B8]" />
+                <div className="space-y-1 max-w-[220px]">
+                  <h3 className="text-lg font-semibold text-white">
+                    Import Your GPX
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Drop any Strava, Garmin, Nike Run Club, or Apple Watch .GPX file
+                    to generate a flat, non-overlapping 3-lane world.
+                  </p>
+                </div>
+                <span className="px-4 py-2 rounded-full bg-white/10 group-hover:bg-white text-xs font-semibold text-white group-hover:text-[#0B0C22] transition-colors">
+                  Choose .GPX File
+                </span>
+              </button>
             </div>
-            <div className="space-y-1 max-w-[220px]">
-              <h3 className="text-lg font-semibold text-white">
-                Import Your GPX
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Drop any Strava, Garmin, Nike Run Club, or Apple Watch .GPX file
-                to generate a flat, non-overlapping 3-lane world.
-              </p>
-            </div>
-            <span className="px-4 py-2 rounded-full bg-white/10 group-hover:bg-white text-xs font-semibold text-white group-hover:text-[#0B0C22] transition-colors">
-              Choose .GPX File
-            </span>
-          </button>
+          </div>
         </div>
       </div>
     </section>

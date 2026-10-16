@@ -161,7 +161,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
           <span className="text-slate-600" aria-hidden="true">
             ·
           </span>
-          <div className="flex items-center gap-1 text-[#76FFB2] font-bold">
+          <div className="flex items-center gap-1 text-[#d1bcd6] font-bold">
             <Trophy className="w-3.5 h-3.5" />
             <span>{gameStats.score.toLocaleString()} PTS</span>
           </div>
@@ -189,14 +189,14 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-white flex items-center gap-1 transition-all whitespace-nowrap shrink-0 border border-white/10"
             title="Switch to Left Lane (Keyboard A or ←)"
           >
-            <ArrowLeft className="w-3.5 h-3.5 text-[#76FFB2]" />
+            <ArrowLeft className="w-3.5 h-3.5 text-[#d1bcd6]" />
             <span>Left (A)</span>
           </button>
 
           <button
             type="button"
             onClick={onJump}
-            className="px-3 py-1.5 rounded-xl bg-[#76FFB2] hover:bg-[#95ffbe] active:scale-95 text-xs font-bold text-[#0B0C22] flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#d1bcd6] hover:bg-[#decce3] active:scale-95 text-xs font-bold text-[#0B0C22] flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-sm"
             title="Jump over Cloud Hurdles & grab Air Coins (Space or ↑)"
           >
             <ArrowUp className="w-3.5 h-3.5" />
@@ -210,7 +210,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             title="Switch to Right Lane (Keyboard D or →)"
           >
             <span>Right (D)</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#76FFB2]" />
+            <ArrowRight className="w-3.5 h-3.5 text-[#d1bcd6]" />
           </button>
         </div>
 
@@ -269,7 +269,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             {isMuted ? (
               <VolumeX className="w-3.5 h-3.5 text-rose-400" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-[#76FFB2]" />
+              <Volume2 className="w-3.5 h-3.5 text-[#d1bcd6]" />
             )}
           </button>
 
@@ -285,7 +285,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
               </>
             ) : (
               <>
-                <ChevronDown className="w-3.5 h-3.5 text-[#76FFB2]" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#d1bcd6]" />
                 <span>Zen</span>
               </>
             )}
@@ -315,7 +315,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
 
               <div>
                 <div className="text-[11px] text-slate-400">Current Pace</div>
-                <div className="text-base font-bold font-mono-tabular text-[#76FFB2]">
+                <div className="text-base font-bold font-mono-tabular text-[#d1bcd6]">
                   {formatPace(currentPoint.paceMinPerKm)}
                   <span className="text-xs font-normal text-slate-400 ml-0.5">
                     /km
@@ -470,13 +470,13 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
 
-              {/* Locked 2.0x Speed Indicator */}
+              {/* Locked 1.3x Speed Indicator */}
               <div
-                className="px-3 py-1.5 rounded-xl bg-[#090B1F] border border-[#76FFB2]/40 text-xs font-mono-tabular font-bold text-[#76FFB2] flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                title="Playback speed is locked at 2.0x"
+                className="px-3 py-1.5 rounded-xl bg-[#090B1F] border border-[#d1bcd6]/40 text-xs font-mono-tabular font-bold text-[#d1bcd6] flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                title="Playback speed is locked at 1.3x"
               >
                 <Gauge className="w-3.5 h-3.5" />
-                <span>2.0x Speed Locked</span>
+                <span>1.3x Speed Locked</span>
               </div>
 
               {/* Finish Run & Save Score to Dashboard */}
@@ -500,7 +500,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                   onClick={() => onChangeCamera(cam.id)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                     cameraMode === cam.id
-                      ? 'bg-[#76FFB2] text-[#0B0C22] font-semibold'
+                      ? 'bg-[#d1bcd6] text-[#0B0C22] font-semibold'
                       : 'text-slate-300 hover:text-white'
                   }`}
                 >
