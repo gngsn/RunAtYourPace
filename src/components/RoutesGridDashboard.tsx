@@ -250,34 +250,18 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
   activeCourse,
   themeId,
   characterId,
-  gameStats,
   courseRecords,
   lastCompletedSummary,
   onDismissCompletedSummary,
   onSelectAndLaunchCourse,
   onPreviewCourse,
-  onInspectCourseReport,
   onChangeTheme,
   onChangeCharacter,
   onTriggerUploadGpx,
   onReturnTo3DWorld,
-  onOpenStats,
   onOpenHome,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  const totalSavedStats = useMemo(() => {
-    const records = Object.values(courseRecords);
-    const totalBestScore = records.reduce((acc, r) => acc + r.bestScore, 0);
-    const totalBestCoins = records.reduce((acc, r) => acc + r.bestCoins, 0);
-    const totalRuns = records.reduce((acc, r) => acc + r.completedRuns, 0);
-    return {
-      totalBestScore,
-      totalBestCoins,
-      totalRuns,
-      completedCoursesCount: records.length,
-    };
-  }, [courseRecords]);
 
   // Sort courses by newest first (most recently completed or newest added first)
   const filteredCourses = useMemo(() => {
@@ -328,13 +312,10 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
               className="flex items-center gap-3 text-left group cursor-pointer shrink-0"
             >
               <div
-                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center shadow-md border border-white/60 group-hover:scale-105 transition-transform"
-                style={{
-                  background:
-                    'radial-gradient(circle at 35% 30%, #FF94C2, #5B8EF4 70%, #1E1B4B)',
-                }}
+                className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center shadow-sm border border-white/60 bg-[#d1bcd6] group-hover:scale-105 transition-transform"
+                style={{ backgroundColor: '#d1bcd6' }}
               >
-                <Sparkles className="w-5 h-5 text-white" />
+                <Sparkles className="w-5 h-5 text-[#1E1B4B]" />
               </div>
               <div>
                 <div className="text-lg sm:text-xl font-extrabold font-display tracking-tight text-[#1E1B4B] leading-tight">
@@ -346,20 +327,23 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
               </div>
             </button>
 
-            <div className="flex-1 min-w-[220px] max-w-md flex items-center gap-2.5 bg-[#121428]/90 border border-white/15 rounded-full px-4 py-2.5 shadow-xl text-white">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <div
+              className="flex-1 min-w-[220px] max-w-md flex items-center gap-2.5 bg-[#d1bcd6] border border-white/60 rounded-full px-4 py-2.5 shadow-sm text-[#1E1B4B]"
+              style={{ backgroundColor: '#d1bcd6' }}
+            >
+              <Search className="w-4 h-4 text-[#4C3B63] shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search My Routes..."
-                className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
+                className="w-full bg-transparent text-sm text-[#1E1B4B] placeholder:text-[#4C3B63] focus:outline-none"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="text-xs text-slate-400 hover:text-white"
+                  className="text-xs text-[#4C3B63] hover:text-[#1E1B4B] font-semibold"
                 >
                   Clear
                 </button>
@@ -367,23 +351,13 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
             </div>
           </div>
 
-          {/* Right Quick Actions: My Stats, Import GPX & Return to Live 3D World */}
+          {/* Right Quick Actions: Import GPX & Return to Live 3D World (Stats removed) */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {onOpenStats && (
-              <button
-                type="button"
-                onClick={onOpenStats}
-                className="px-4 py-3 rounded-full bg-[#151832] hover:bg-[#1E2246] border border-white/15 text-xs font-semibold text-white flex items-center gap-2 transition-all shadow-lg cursor-pointer"
-              >
-                <Trophy className="w-4 h-4 text-[#FACC15]" />
-                <span>My Stats</span>
-              </button>
-            )}
-
             <button
               type="button"
               onClick={onTriggerUploadGpx}
-              className="px-4 py-3 rounded-full bg-[#151832] hover:bg-[#1E2246] border border-white/15 text-xs font-semibold text-white flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+              className="px-4 py-3 rounded-full bg-[#d1bcd6] hover:bg-[#decce3] border border-white/60 text-xs font-bold text-[#1E1B4B] flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+              style={{ backgroundColor: '#d1bcd6' }}
             >
               <Upload className="w-4 h-4 text-[#FF85B8]" />
               <span>Import .GPX</span>
@@ -392,7 +366,8 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
             <button
               type="button"
               onClick={onReturnTo3DWorld}
-              className="px-5 py-3 rounded-full bg-[#d1bcd6] hover:bg-[#decce3] text-[#070818] text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+              className="px-5 py-3 rounded-full bg-[#d1bcd6] hover:bg-[#decce3] border border-white/60 text-[#1E1B4B] text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+              style={{ backgroundColor: '#d1bcd6' }}
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Start / Resume 3D Run</span>
@@ -402,14 +377,17 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
 
         {/* Celebratory Banner when Returning to Dashboard After Completing a Run */}
         {lastCompletedSummary && (
-          <div className="relative rounded-3xl p-5 bg-gradient-to-r from-[#1A1D42] via-[#231B49] to-[#16273E] border-2 border-[#FACC15]/70 shadow-[0_0_40px_rgba(250,204,21,0.22)] flex flex-wrap items-center justify-between gap-4 text-white">
+          <div
+            className="relative rounded-3xl p-5 bg-[#d1bcd6] border-2 border-white/70 shadow-md flex flex-wrap items-center justify-between gap-4 text-[#1E1B4B]"
+            style={{ backgroundColor: '#d1bcd6' }}
+          >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#FACC15]/20 border border-[#FACC15]/50 flex items-center justify-center shrink-0">
-                <Trophy className="w-6 h-6 text-[#FACC15]" />
+              <div className="w-12 h-12 rounded-2xl bg-white/50 border border-white/70 flex items-center justify-center shrink-0">
+                <Trophy className="w-6 h-6 text-[#D97706]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#d1bcd6]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#4C3B63]">
                     Course Completed · Score Saved!
                   </span>
                   {lastCompletedSummary.isNewBest && (
@@ -418,23 +396,23 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                     </span>
                   )}
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold text-white mt-0.5">
+                <h2 className="text-lg sm:text-xl font-bold text-[#1E1B4B] mt-0.5">
                   {lastCompletedSummary.courseTitle}
                 </h2>
-                <p className="text-xs text-slate-300 mt-0.5">
+                <p className="text-xs text-[#4C3B63] mt-0.5">
                   You finished the entire route at 1.3x speed and saved your coin score to the dashboard!
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="text-right font-mono-tabular bg-black/30 px-4 py-2.5 rounded-2xl border border-white/10">
-                <div className="text-xs text-slate-300">Earned Coin Score</div>
-                <div className="text-xl font-extrabold text-[#FACC15] flex items-center justify-end gap-1.5">
-                  <Coins className="w-4 h-4" />
+              <div className="text-right font-mono-tabular bg-white/45 px-4 py-2.5 rounded-2xl border border-white/60">
+                <div className="text-xs text-[#4C3B63]">Earned Coin Score</div>
+                <div className="text-xl font-extrabold text-[#1E1B4B] flex items-center justify-end gap-1.5">
+                  <Coins className="w-4 h-4 text-[#D97706]" />
                   <span>{lastCompletedSummary.score.toLocaleString()} PTS</span>
                 </div>
-                <div className="text-[11px] text-[#d1bcd6]">
+                <div className="text-[11px] text-[#4C3B63]">
                   {lastCompletedSummary.coins}
                   {lastCompletedSummary.totalCoins > 0
                     ? ` / ${lastCompletedSummary.totalCoins}`
@@ -446,7 +424,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
               <button
                 type="button"
                 onClick={onReturnTo3DWorld}
-                className="px-4 py-2.5 rounded-2xl bg-[#d1bcd6] hover:bg-[#decce3] text-[#070818] text-xs font-extrabold flex items-center gap-1.5 transition-colors shadow-md cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl bg-white/80 hover:bg-white text-[#1E1B4B] text-xs font-extrabold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Run Again</span>
@@ -455,7 +433,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
               <button
                 type="button"
                 onClick={onDismissCompletedSummary}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
+                className="p-2 rounded-full bg-white/40 hover:bg-white/70 text-[#4C3B63] hover:text-[#1E1B4B] transition-colors"
                 title="Dismiss"
               >
                 <X className="w-4 h-4" />
@@ -466,13 +444,16 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
 
         {/* Main Two-Column Layout: Left Settings Sidebar + Right Newest-First Routes Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[265px_1fr] gap-7 items-start">
-          {/* Left Settings Sidebar (Theme Switcher + Runner Style + Saved Score Summary) */}
-          <aside className="bg-[#101226]/92 border border-white/15 rounded-3xl p-5 space-y-6 lg:sticky lg:top-6 shadow-2xl text-white">
+          {/* Left Settings Sidebar (Theme Switcher + Runner Style — Background #d1bcd6, Stats removed) */}
+          <aside
+            className="bg-[#d1bcd6] border border-white/60 rounded-3xl p-5 space-y-6 lg:sticky lg:top-6 shadow-md text-[#1E1B4B]"
+            style={{ backgroundColor: '#d1bcd6' }}
+          >
             {/* 1. Theme Settings */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#d1bcd6]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#4C3B63] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#1E1B4B]" />
                   <span>Settings · Theme</span>
                 </span>
               </div>
@@ -487,13 +468,13 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                       onClick={() => onChangeTheme(tId)}
                       className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-medium transition-all flex items-center justify-between gap-2 cursor-pointer border ${
                         active
-                          ? 'bg-white text-[#070818] font-bold border-white shadow-md'
-                          : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
+                          ? 'bg-white text-[#1E1B4B] font-bold border-white shadow-sm'
+                          : 'bg-white/40 text-[#1E1B4B] border-white/50 hover:bg-white/65'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 truncate">
                         <span
-                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/20"
+                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/15"
                           style={{
                             background: `linear-gradient(135deg, ${tCfg.treeFoliagePrimaryHex}, ${tCfg.groundPrimaryHex})`,
                           }}
@@ -508,8 +489,8 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
             </div>
 
             {/* 2. Runner Style Picker (Grid with Short Nicknames) */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <div className="pt-4 border-t border-white/40 space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#4C3B63] flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-[#FF85B8]" />
                 <span>Main Runner</span>
               </span>
@@ -523,12 +504,12 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                       onClick={() => onChangeCharacter(char.id)}
                       className={`p-2 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                         active
-                          ? 'bg-white/15 border-[#d1bcd6] ring-1 ring-[#d1bcd6]/50 shadow-md'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                          ? 'bg-white border-white ring-2 ring-white/80 shadow-sm'
+                          : 'bg-white/40 border-white/50 hover:bg-white/65'
                       }`}
                     >
                       <Character3DThumbnail char={char} size={42} />
-                      <span className="text-[11px] font-extrabold text-white truncate">
+                      <span className="text-[11px] font-extrabold text-[#1E1B4B] truncate">
                         {char.name}
                       </span>
                     </button>
@@ -536,37 +517,9 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                 })}
               </div>
             </div>
-
-            {/* 3. Saved Total Score & Coins */}
-            <div className="pt-4 border-t border-white/10 space-y-2 text-xs font-mono-tabular">
-              <div className="flex items-center justify-between text-[#FACC15] font-bold">
-                <span className="flex items-center gap-1.5">
-                  <Coins className="w-3.5 h-3.5" />
-                  <span>Saved Coins</span>
-                </span>
-                <span>
-                  {totalSavedStats.totalBestCoins > 0
-                    ? totalSavedStats.totalBestCoins
-                    : gameStats.coins}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[#d1bcd6] font-bold">
-                <span className="flex items-center gap-1.5">
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>Total Score</span>
-                </span>
-                <span>
-                  {(totalSavedStats.totalBestScore > 0
-                    ? totalSavedStats.totalBestScore
-                    : gameStats.score
-                  ).toLocaleString()}{' '}
-                  PTS
-                </span>
-              </div>
-            </div>
           </aside>
 
-          {/* Right Column: Newest-First Routes Grid (Category tabs removed) */}
+          {/* Right Column: Newest-First Routes Grid */}
           <div className="space-y-4 min-w-0">
             <div className="flex items-center justify-between pb-2 border-b border-[#1E1B4B]/15">
               <h2 className="text-xl sm:text-2xl font-extrabold font-display tracking-tight text-[#1E1B4B]">
@@ -609,46 +562,43 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                     }}
                     className={`group relative rounded-[38px] p-6 flex flex-col items-center justify-between min-h-[355px] cursor-pointer transition-all duration-300 overflow-hidden ${
                       isSelected
-                        ? 'ring-3 ring-white shadow-[0_0_45px_rgba(255,255,255,0.22)] -translate-y-1'
-                        : 'hover:-translate-y-1.5 hover:shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
+                        ? 'ring-3 ring-white shadow-[0_12px_35px_rgba(120,82,145,0.25)] -translate-y-1'
+                        : 'hover:-translate-y-1.5 hover:shadow-[0_16px_40px_rgba(120,82,145,0.22)]'
                     }`}
                     style={{
                       background: `radial-gradient(circle at 50% 54%, ${course.cardAura.innerGlow} 0%, ${course.cardAura.outerBg} 74%)`,
-                      boxShadow: `inset 0 1px 2px ${course.cardAura.rimHighlight}, inset 0 -10px 28px rgba(15, 23, 42, 0.18)`,
+                      boxShadow: `inset 0 1px 2px ${course.cardAura.rimHighlight}`,
                     }}
                   >
-                    {/* Top Row: Active / Completed Score Badge & Report Quick Action */}
+                    {/* Top Row: Active / Completed Score Badge (Report stats button removed, dark pill backgrounds -> #d1bcd6) */}
                     <div className="w-full flex items-center justify-between gap-2 z-10">
                       {record ? (
-                        <span className="px-2.5 py-1 rounded-full bg-black/35 backdrop-blur-md text-[11px] font-bold text-[#FACC15] flex items-center gap-1 border border-[#FACC15]/40">
-                          <Trophy className="w-3 h-3 text-[#FACC15]" />
+                        <span
+                          className="px-2.5 py-1 rounded-full bg-[#d1bcd6] text-[11px] font-bold text-[#1E1B4B] flex items-center gap-1 border border-white/60 shadow-xs"
+                          style={{ backgroundColor: '#d1bcd6' }}
+                        >
+                          <Trophy className="w-3 h-3 text-[#D97706]" />
                           <span>
                             Best {record.bestScore.toLocaleString()} PTS ·{' '}
                             {record.bestCoins} Coins
                           </span>
                         </span>
                       ) : isSelected ? (
-                        <span className="px-2.5 py-0.5 rounded-full bg-black/25 backdrop-blur-md text-[11px] font-semibold text-white flex items-center gap-1 border border-white/30">
-                          <Check className="w-3 h-3 text-[#d1bcd6]" />
+                        <span
+                          className="px-2.5 py-0.5 rounded-full bg-[#d1bcd6] text-[11px] font-semibold text-[#1E1B4B] flex items-center gap-1 border border-white/60 shadow-xs"
+                          style={{ backgroundColor: '#d1bcd6' }}
+                        >
+                          <Check className="w-3 h-3 text-[#1E1B4B]" />
                           <span>Active Route</span>
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-medium text-white/95">
+                        <span
+                          className="px-2.5 py-0.5 rounded-full bg-[#d1bcd6] text-[11px] font-medium text-[#1E1B4B] border border-white/50"
+                          style={{ backgroundColor: '#d1bcd6' }}
+                        >
                           {course.totalDistanceKm.toFixed(1)} km · 1.3x
                         </span>
                       )}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onInspectCourseReport(course);
-                        }}
-                        className="p-2 rounded-full bg-black/20 hover:bg-black/35 text-white/90 hover:text-white transition-colors backdrop-blur-md"
-                        title="Inspect 1km Splits & 3D Landmarks"
-                      >
-                        <BarChart3 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
 
                     {/* Top-Centered Editorial Title & Duration Subtitle */}
@@ -656,7 +606,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                       <h3 className="text-lg sm:text-xl font-semibold text-white tracking-tight drop-shadow-sm">
                         {course.shortTitle}
                       </h3>
-                      <p className="text-xs sm:text-sm text-white/85 font-medium mt-0.5">
+                      <p className="text-xs sm:text-sm text-white/90 font-medium mt-0.5">
                         {durationMins} min · {formatPace(course.avgPaceMinPerKm)}/km · 3 Lanes
                       </p>
                     </div>
@@ -670,10 +620,10 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                     </div>
 
                     {/* Bottom Subtle Course Location & Saved Coin Record Footer */}
-                    <div className="w-full pt-2 border-t border-white/20 flex items-center justify-between gap-2 text-xs text-white/95 z-10">
+                    <div className="w-full pt-2 border-t border-white/25 flex items-center justify-between gap-2 text-xs text-white/95 z-10">
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{course.title}</div>
-                        <div className="text-[11px] text-white/75 flex items-center gap-1 truncate">
+                        <div className="text-[11px] text-white/80 flex items-center gap-1 truncate">
                           <MapPin className="w-3 h-3 shrink-0" />
                           <span className="truncate">{course.locationLabel}</span>
                         </div>
@@ -681,12 +631,18 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
 
                       <div className="shrink-0 flex items-center gap-2">
                         {record ? (
-                          <span className="text-[11px] font-mono-tabular font-semibold bg-black/30 text-[#d1bcd6] px-2.5 py-1 rounded-full flex items-center gap-1 border border-[#d1bcd6]/30">
+                          <span
+                            className="text-[11px] font-mono-tabular font-semibold bg-[#d1bcd6] text-[#1E1B4B] px-2.5 py-1 rounded-full flex items-center gap-1 border border-white/60"
+                            style={{ backgroundColor: '#d1bcd6' }}
+                          >
                             <Award className="w-3 h-3" />
                             <span>{record.completedRuns}× Clear</span>
                           </span>
                         ) : (
-                          <span className="text-[11px] font-mono-tabular bg-black/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <span
+                            className="text-[11px] font-mono-tabular bg-[#d1bcd6] text-[#1E1B4B] px-2.5 py-1 rounded-full flex items-center gap-1 border border-white/50"
+                            style={{ backgroundColor: '#d1bcd6' }}
+                          >
                             <Layers className="w-3 h-3" />
                             <span>Flat 0m</span>
                           </span>
@@ -698,7 +654,7 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                             onSelectAndLaunchCourse(course);
                           }}
                           title="Quick Launch 3D Run"
-                          className="w-8 h-8 rounded-full bg-white text-[#0B0C22] flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
+                          className="w-8 h-8 rounded-full bg-white text-[#1E1B4B] flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
                         >
                           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                         </button>
@@ -708,25 +664,26 @@ export const RoutesGridDashboard: React.FC<RoutesGridDashboardProps> = ({
                 );
               })}
 
-              {/* Upload Custom GPX Squircle Card */}
+              {/* Upload Custom GPX Squircle Card (Dark background -> #d1bcd6) */}
               <button
                 type="button"
                 onClick={onTriggerUploadGpx}
-                className="group relative rounded-[38px] p-6 flex flex-col items-center justify-center gap-4 min-h-[355px] border-2 border-dashed border-white/20 hover:border-[#FF85B8] bg-[#10132A]/60 hover:bg-[#151936]/80 transition-all duration-300 text-center"
+                className="group relative rounded-[38px] p-6 flex flex-col items-center justify-center gap-4 min-h-[355px] border-2 border-dashed border-white/70 hover:border-[#FF85B8] bg-[#d1bcd6] hover:bg-[#decce3] transition-all duration-300 text-center cursor-pointer shadow-sm"
+                style={{ backgroundColor: '#d1bcd6' }}
               >
-                <div className="w-16 h-16 rounded-3xl bg-white/10 group-hover:bg-[#FF85B8]/20 flex items-center justify-center transition-colors">
+                <div className="w-16 h-16 rounded-3xl bg-white/50 group-hover:bg-white/80 flex items-center justify-center transition-colors">
                   <Upload className="w-7 h-7 text-[#FF85B8]" />
                 </div>
                 <div className="space-y-1 max-w-[220px]">
-                  <h3 className="text-lg font-semibold text-white">
+                  <h3 className="text-lg font-bold text-[#1E1B4B]">
                     Import Your GPX
                   </h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
+                  <p className="text-xs text-[#4C3B63] leading-relaxed">
                     Drop any Strava, Garmin, Nike Run Club, or Apple Watch .GPX file
                     to generate a flat, non-overlapping 3-lane world.
                   </p>
                 </div>
-                <span className="px-4 py-2 rounded-full bg-white/10 group-hover:bg-white text-xs font-semibold text-white group-hover:text-[#0B0C22] transition-colors">
+                <span className="px-4 py-2 rounded-full bg-white/75 group-hover:bg-white text-xs font-bold text-[#1E1B4B] transition-colors shadow-xs">
                   Choose .GPX File
                 </span>
               </button>

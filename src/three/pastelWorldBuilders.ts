@@ -177,8 +177,63 @@ export interface FeltRunnerRig {
 }
 
 /**
- * Builds the 14-part articulated Needle-Felt Runner character with 2-joint legs (hip + knee + shoe)
- * so forward running strides look natural, plus 3 selectable character headgear/styles.
+ * Creates a smooth vertical gradient texture (top -> bottom on Three.js primitives).
+ */
+function createVerticalGradientTexture(
+  stops: Array<{ offset: number; color: string }>
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  for (const s of stops) {
+    grad.addColorStop(s.offset, s.color);
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 256);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Smooth, soft-gloss 3D vinyl/clay material matching the 5 reference character renders.
+ */
+function createToyMaterial(
+  colorOrMap: string | THREE.Texture,
+  options?: {
+    roughness?: number;
+    clearcoat?: number;
+    emissiveHex?: string;
+    emissiveIntensity?: number;
+  }
+): THREE.MeshPhysicalMaterial {
+  const isTex = typeof colorOrMap !== 'string';
+  return new THREE.MeshPhysicalMaterial({
+    color: isTex ? new THREE.Color('#FFFFFF') : new THREE.Color(colorOrMap),
+    map: isTex ? colorOrMap : null,
+    roughness: options?.roughness ?? 0.32,
+    metalness: 0.02,
+    clearcoat: options?.clearcoat ?? 0.35,
+    clearcoatRoughness: 0.28,
+    sheen: 0.25,
+    sheenRoughness: 0.5,
+    sheenColor: new THREE.Color('#FFFFFF'),
+    emissive: new THREE.Color(
+      options?.emissiveHex ?? (isTex ? '#222222' : colorOrMap)
+    ),
+    emissiveIntensity: options?.emissiveIntensity ?? 0.06,
+  });
+}
+
+/**
+ * Builds the articulated 3D Runner with 5 distinct full-body character models matching the 5 reference images:
+ * - hoodie_kid (Main: 03_hoodie.png)
+ * - topknot_kid (01_sprout_smile.png)
+ * - starlight_fox (02_peach_xeyes.png)
+ * - flower_orb (04_flower.png)
+ * - mint_sprinter (05_beanie.png)
  */
 export function createFeltRunnerRig(
   bumpMap: THREE.Texture,
@@ -203,270 +258,851 @@ export function createFeltRunnerRig(
   shadowMesh.position.y = 0.03;
   root.add(shadowMesh);
 
-  const skinMat = createFeltMaterial('#FFE4E1', bumpMap, {
-    sheenColorHex: '#FFF0F5',
-    roughness: 0.85,
+  // Legacy material refs kept for interface compatibility
+  const sweaterMat = createFeltMaterial(initialTheme.runnerSweaterHex, bumpMap);
+  const pantsMat = createFeltMaterial(initialTheme.runnerPantsHex, bumpMap);
+  const hatMat = createFeltMaterial(initialTheme.runnerHatHex, bumpMap);
+  const hatGroup = new THREE.Group();
+  const flowerCrownGroup = new THREE.Group();
+  const topknotGroup = new THREE.Group();
+
+  // Shared materials
+  const whiteEyeMat = createToyMaterial('#FFFFFF', {
+    roughness: 0.18,
+    clearcoat: 0.6,
   });
-  const eyeMat = new THREE.MeshBasicMaterial({ color: '#1E1B4B' });
-  const blushMat = createFeltMaterial('#FF8DA1', bumpMap, {
-    emissiveHex: '#FF8DA1',
-    emissiveIntensity: 0.25,
+  const darkPupilMat = createToyMaterial('#18181B', {
+    roughness: 0.12,
+    clearcoat: 0.85,
   });
-  const sweaterMat = createFeltMaterial(
-    initialTheme.runnerSweaterHex,
-    bumpMap,
-    {
-      sheenColorHex: '#FFFFFF',
-      bumpScale: 0.05,
-    }
-  );
-  const collarMat = createFeltMaterial('#FF9EBB', bumpMap, {
-    sheenColorHex: '#FFF5F7',
+  const pinkSkinMat = createToyMaterial('#FBBAB6');
+  const blushPinkMat = createToyMaterial('#F68BA2', {
+    emissiveHex: '#F68BA2',
+    emissiveIntensity: 0.15,
   });
-  const pantsMat = createFeltMaterial(initialTheme.runnerPantsHex, bumpMap, {
-    sheenColorHex: '#E2E8F0',
-    bumpScale: 0.045,
-  });
-  const shoeMat = createFeltMaterial('#FF94B2', bumpMap, {
-    sheenColorHex: '#FFE4E6',
-    roughness: 0.75,
-  });
-  const hatMat = createFeltMaterial(initialTheme.runnerHatHex, bumpMap, {
-    sheenColorHex: '#FFFFFF',
+  const aquaHairMat = createToyMaterial('#10D4C6');
+  const yellowHoodMat = createToyMaterial('#FDE69E');
+  const aquaBootMat = createToyMaterial('#1EE0D2');
+  const yellowCuffMat = createToyMaterial('#FDE294');
+
+  const momoTealLimbMat = createToyMaterial('#08C6B8');
+  const momoPinkTrimMat = createToyMaterial('#F9A8E8');
+  const momoPinkBootMat = createToyMaterial('#F68CE4');
+  const momoCoralLipMat = createToyMaterial('#FC8E62');
+
+  const cocoPeachLimbMat = createToyMaterial('#F9B7AC');
+  const cocoTealRomperMat = createToyMaterial('#09B8BE');
+  const cocoCoralBootMat = createToyMaterial('#F5906C');
+  const cocoMouthMat = createToyMaterial('#F94C66', {
+    emissiveHex: '#F43F5E',
+    emissiveIntensity: 0.15,
   });
 
-  // 1. Torso (cozy rounded wool sweater)
-  const torsoGeo = new THREE.CapsuleGeometry(0.42, 0.54, 12, 24);
-  const torsoMesh = new THREE.Mesh(torsoGeo, sweaterMat);
-  torsoMesh.position.y = 1.44;
-  torsoMesh.castShadow = true;
-  bodyGroup.add(torsoMesh);
+  const bloomPinkLimbMat = createToyMaterial('#FCA2E6');
+  const bloomYellowLipMat = createToyMaterial('#FFE619', {
+    emissiveHex: '#FACC15',
+    emissiveIntensity: 0.15,
+  });
+  const bloomLeafMat = createToyMaterial('#06C896');
+  const bloomPetalMat = createToyMaterial('#F875E8');
+  const bloomPotRimMat = createToyMaterial('#14D4C0');
 
-  // Sweater ribbed collar & waist band
-  const collarGeo = new THREE.TorusGeometry(0.29, 0.075, 12, 24);
-  const collarMesh = new THREE.Mesh(collarGeo, collarMat);
-  collarMesh.rotation.x = Math.PI / 2;
-  collarMesh.position.y = 1.85;
-  bodyGroup.add(collarMesh);
+  const mintTealMat = createToyMaterial('#06BFC4');
+  const mintBeanieMat = createToyMaterial('#FDE29C');
+  const mintBeanieBrimMat = createToyMaterial('#FDD57E');
+  const mintSleeveMat = createToyMaterial('#FCA568');
+  const mintBootMat = createToyMaterial('#FA8B68');
 
-  // Cozy backpack / felt pouch on back (-Z) so back-view looks extra detailed
-  const backpackGeo = new THREE.BoxGeometry(0.46, 0.48, 0.24);
-  const backpackMesh = new THREE.Mesh(backpackGeo, collarMat);
-  backpackMesh.position.set(0, 1.48, -0.34);
-  backpackMesh.castShadow = true;
-  bodyGroup.add(backpackMesh);
+  // Gradient textures matching the 5 reference images
+  const hoodieGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FFF0A8' },
+    { offset: 0.48, color: '#F2E8A6' },
+    { offset: 0.82, color: '#26D8CB' },
+    { offset: 1.0, color: '#05C2C4' },
+  ]);
+  const hoodieGradMat = createToyMaterial(hoodieGradTex);
 
-  const hemGeo = new THREE.TorusGeometry(0.4, 0.06, 12, 24);
-  const hemMesh = new THREE.Mesh(hemGeo, collarMat);
-  hemMesh.rotation.x = Math.PI / 2;
-  hemMesh.position.y = 1.09;
-  bodyGroup.add(hemMesh);
+  const momoHeadGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FEF2BA' },
+    { offset: 0.52, color: '#C5ECC8' },
+    { offset: 0.85, color: '#28CEBE' },
+    { offset: 1.0, color: '#09BFC0' },
+  ]);
+  const momoHeadMat = createToyMaterial(momoHeadGradTex);
 
-  // 2. Head, Eyes & Blushing Cheeks (Facing +Z)
+  const momoRomperGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FCDAD8' },
+    { offset: 0.45, color: '#FAA8E4' },
+    { offset: 1.0, color: '#F25CE0' },
+  ]);
+  const momoRomperMat = createToyMaterial(momoRomperGradTex);
+
+  const sproutPlumeGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FFF0AC' },
+    { offset: 0.65, color: '#D4EBB8' },
+    { offset: 1.0, color: '#14C8B8' },
+  ]);
+  const sproutPlumeMat = createToyMaterial(sproutPlumeGradTex);
+
+  const cocoHeadGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FDE4AF' },
+    { offset: 0.55, color: '#FAB88A' },
+    { offset: 1.0, color: '#F4956E' },
+  ]);
+  const cocoHeadMat = createToyMaterial(cocoHeadGradTex);
+
+  const bloomOrbGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#42F2D6' },
+    { offset: 0.35, color: '#7CE4E8' },
+    { offset: 0.58, color: '#C4B2F8' },
+    { offset: 0.82, color: '#FF6AD5' },
+    { offset: 1.0, color: '#FF42BF' },
+  ]);
+  const bloomOrbMat = createToyMaterial(bloomOrbGradTex, {
+    roughness: 0.24,
+    clearcoat: 0.5,
+  });
+
+  const bloomBootGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#7CD4F8' },
+    { offset: 0.5, color: '#C4A8F8' },
+    { offset: 1.0, color: '#FF5AD0' },
+  ]);
+  const bloomBootMat = createToyMaterial(bloomBootGradTex);
+
+  const mintTunicGradTex = createVerticalGradientTexture([
+    { offset: 0.0, color: '#FECA6A' },
+    { offset: 0.58, color: '#FCA46C' },
+    { offset: 1.0, color: '#FA7A72' },
+  ]);
+  const mintTunicMat = createToyMaterial(mintTunicGradTex);
+
+  // ============================================================================
+  // TORSO & HEAD GROUPS PER CHARACTER
+  // ============================================================================
   const headGroup = new THREE.Group();
-  headGroup.position.y = 2.25;
+  headGroup.position.y = 2.15;
   bodyGroup.add(headGroup);
 
-  const headGeo = new THREE.SphereGeometry(0.39, 24, 24);
-  const headMesh = new THREE.Mesh(headGeo, skinMat);
-  headMesh.scale.set(1.05, 0.98, 1.0);
-  headMesh.castShadow = true;
-  headGroup.add(headMesh);
-
-  const eyeGeo = new THREE.SphereGeometry(0.042, 10, 10);
-  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(-0.14, 0.04, 0.35);
-  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(0.14, 0.04, 0.35);
-  headGroup.add(leftEye, rightEye);
-
-  const cheekGeo = new THREE.SphereGeometry(0.078, 12, 12);
-  const leftCheek = new THREE.Mesh(cheekGeo, blushMat);
-  leftCheek.position.set(-0.23, -0.05, 0.32);
-  const rightCheek = new THREE.Mesh(cheekGeo, blushMat);
-  rightCheek.position.set(0.23, -0.05, 0.32);
-  headGroup.add(leftCheek, rightCheek);
-
-  // 3A. Style 1: Brimmed Felt Hat (hoodie_kid)
-  const hatGroup = new THREE.Group();
-  headGroup.add(hatGroup);
-
-  const brimGeo = new THREE.CylinderGeometry(0.56, 0.6, 0.08, 24);
-  const brimMesh = new THREE.Mesh(brimGeo, hatMat);
-  brimMesh.position.y = 0.16;
-  const crownGeo = new THREE.SphereGeometry(
-    0.4,
-    20,
-    16,
-    0,
-    Math.PI * 2,
-    0,
-    Math.PI * 0.6
-  );
-  const crownMesh = new THREE.Mesh(crownGeo, hatMat);
-  crownMesh.position.y = 0.14;
-  const ribbonGeo = new THREE.TorusGeometry(0.39, 0.045, 10, 24);
-  const ribbonMesh = new THREE.Mesh(ribbonGeo, collarMat);
-  ribbonMesh.rotation.x = Math.PI / 2;
-  ribbonMesh.position.y = 0.21;
-  hatGroup.add(brimMesh, crownMesh, ribbonMesh);
-
-  // 3B. Style 2: Pastel Flower-Orb Petal Halo (flower_orb)
-  const flowerCrownGroup = new THREE.Group();
-  headGroup.add(flowerCrownGroup);
-  const petalMat = createFeltMaterial('#FF85B8', bumpMap, {
-    emissiveHex: '#FF85B8',
-    emissiveIntensity: 0.32,
-  });
-  const centerGemMat = createFeltMaterial('#FEF08A', bumpMap, {
-    emissiveHex: '#FACC15',
-    emissiveIntensity: 0.45,
-  });
-  for (let p = 0; p < 6; p++) {
-    const ang = (p / 6) * Math.PI * 2;
-    const petal = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 12, 12),
-      petalMat
-    );
-    petal.position.set(Math.cos(ang) * 0.28, 0.36, Math.sin(ang) * 0.28);
-    petal.scale.set(1.1, 0.65, 1.1);
-    flowerCrownGroup.add(petal);
-  }
-  const topBud = new THREE.Mesh(
-    new THREE.SphereGeometry(0.19, 14, 14),
-    centerGemMat
-  );
-  topBud.position.set(0, 0.44, 0);
-  flowerCrownGroup.add(topBud);
-
-  // 3C. Style 3: Twin Cloud Topknot & Earmuffs (topknot_kid)
-  const topknotGroup = new THREE.Group();
-  headGroup.add(topknotGroup);
-  const bunMat = createFeltMaterial('#C4B5FD', bumpMap, {
-    emissiveHex: '#A78BFA',
-    emissiveIntensity: 0.24,
-  });
-  const leftBun = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 14, 14),
-    bunMat
-  );
-  leftBun.position.set(-0.28, 0.34, -0.04);
-  const rightBun = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 14, 14),
-    bunMat
-  );
-  rightBun.position.set(0.28, 0.34, -0.04);
-  topknotGroup.add(leftBun, rightBun);
-
-  // 3D. Style 4: Mint Aero Visor & Wing Headband (mint_sprinter)
-  const mintVisorGroup = new THREE.Group();
-  headGroup.add(mintVisorGroup);
-  const visorMat = createFeltMaterial('#6EE7B7', bumpMap, {
-    emissiveHex: '#34D399',
-    emissiveIntensity: 0.3,
-  });
-  const bandRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.39, 0.055, 10, 24),
-    visorMat
-  );
-  bandRing.rotation.x = Math.PI / 2;
-  bandRing.position.y = 0.16;
-  const visorBill = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.44, 0.48, 0.05, 20, 1, false, -0.9, 1.8),
-    visorMat
-  );
-  visorBill.position.set(0, 0.14, 0.15);
-  mintVisorGroup.add(bandRing, visorBill);
-
-  // 3E. Style 5: Starlight Felt Fox Ears & Star Crest (starlight_fox)
-  const foxEarsGroup = new THREE.Group();
-  headGroup.add(foxEarsGroup);
-  const foxMat = createFeltMaterial('#FDBA74', bumpMap, {
-    emissiveHex: '#FB923C',
-    emissiveIntensity: 0.28,
-  });
-  const leftEar = new THREE.Mesh(
-    new THREE.ConeGeometry(0.17, 0.36, 12),
-    foxMat
-  );
-  leftEar.position.set(-0.24, 0.42, 0.02);
-  leftEar.rotation.z = 0.25;
-  const rightEar = new THREE.Mesh(
-    new THREE.ConeGeometry(0.17, 0.36, 12),
-    foxMat
-  );
-  rightEar.position.set(0.24, 0.42, 0.02);
-  rightEar.rotation.z = -0.25;
-  const starCrest = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.14, 0),
-    centerGemMat
-  );
-  starCrest.position.set(0, 0.52, 0.12);
-  foxEarsGroup.add(leftEar, rightEar, starCrest);
-
-  // 4. Articulated Left & Right Arms
-  const createArm = (side: -1 | 1) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(side * 0.52, 1.72, 0);
-
-    const armGeo = new THREE.CapsuleGeometry(0.135, 0.44, 10, 16);
-    const armMesh = new THREE.Mesh(armGeo, sweaterMat);
-    armMesh.position.y = -0.25;
-    armMesh.castShadow = true;
-    pivot.add(armMesh);
-
-    const cuffGeo = new THREE.TorusGeometry(0.13, 0.04, 10, 18);
-    const cuffMesh = new THREE.Mesh(cuffGeo, collarMat);
-    cuffMesh.rotation.x = Math.PI / 2;
-    cuffMesh.position.y = -0.46;
-    pivot.add(cuffMesh);
-
-    const handGeo = new THREE.SphereGeometry(0.125, 14, 14);
-    const handMesh = new THREE.Mesh(handGeo, skinMat);
-    handMesh.position.y = -0.58;
-    pivot.add(handMesh);
-
-    bodyGroup.add(pivot);
-    return pivot;
+  const charTorsoGroups: Record<CharacterModelId, THREE.Group> = {
+    hoodie_kid: new THREE.Group(),
+    topknot_kid: new THREE.Group(),
+    starlight_fox: new THREE.Group(),
+    flower_orb: new THREE.Group(),
+    mint_sprinter: new THREE.Group(),
+  };
+  const charHeadGroups: Record<CharacterModelId, THREE.Group> = {
+    hoodie_kid: new THREE.Group(),
+    topknot_kid: new THREE.Group(),
+    starlight_fox: new THREE.Group(),
+    flower_orb: new THREE.Group(),
+    mint_sprinter: new THREE.Group(),
   };
 
-  const leftArmPivot = createArm(-1);
-  const rightArmPivot = createArm(1);
+  (Object.keys(charTorsoGroups) as CharacterModelId[]).forEach((k) => {
+    bodyGroup.add(charTorsoGroups[k]);
+    headGroup.add(charHeadGroups[k]);
+  });
 
-  // 5. 2-Joint Articulated Legs (Hip Pivot + Knee Pivot + Felt Running Shoe)
+  // Helper to build big round white + black eyes (used by Hoodie & Beanie)
+  const addBigWhiteBlackEyes = (
+    parent: THREE.Group,
+    zFront: number,
+    cheekMat: THREE.Material
+  ) => {
+    [-1, 1].forEach((side) => {
+      const sclera = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 18, 18),
+        whiteEyeMat
+      );
+      sclera.scale.set(0.95, 1.08, 0.52);
+      sclera.position.set(side * 0.13, 0.01, zFront);
+      parent.add(sclera);
+
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(0.074, 16, 16),
+        darkPupilMat
+      );
+      pupil.scale.set(0.95, 1.05, 0.55);
+      pupil.position.set(side * 0.13, 0.01, zFront + 0.032);
+      parent.add(pupil);
+
+      const catchlight = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 10, 10),
+        whiteEyeMat
+      );
+      catchlight.position.set(side * 0.13 - 0.025, 0.035, zFront + 0.068);
+      parent.add(catchlight);
+
+      const cheek = new THREE.Mesh(
+        new THREE.SphereGeometry(0.072, 14, 14),
+        cheekMat
+      );
+      cheek.scale.set(1.25, 0.72, 0.5);
+      cheek.position.set(side * 0.22, -0.075, zFront - 0.035);
+      parent.add(cheek);
+    });
+
+    // Cute black '◡' smile arc
+    const smile = new THREE.Mesh(
+      new THREE.TorusGeometry(0.052, 0.017, 10, 20, Math.PI),
+      darkPupilMat
+    );
+    smile.rotation.z = Math.PI;
+    smile.position.set(0, -0.07, zFront + 0.02);
+    parent.add(smile);
+  };
+
+  // Helper to build topknot double hairband + 4 plumes (used by Momo & Coco)
+  const addSproutTopknot = (
+    parent: THREE.Group,
+    bandBottomMat: THREE.Material,
+    bandTopMat: THREE.Material,
+    plumeMat: THREE.Material
+  ) => {
+    const band1 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.16, 0.046, 14, 24),
+      bandBottomMat
+    );
+    band1.rotation.x = Math.PI / 2;
+    band1.position.set(0, 0.46, 0);
+    parent.add(band1);
+
+    const band2 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.155, 0.044, 14, 24),
+      bandTopMat
+    );
+    band2.rotation.x = Math.PI / 2;
+    band2.position.set(0, 0.525, 0);
+    parent.add(band2);
+
+    // 4 rounded teardrop plumes fanning out from the band
+    const plumeConfigs = [
+      { x: -0.14, y: 0.67, z: 0.02, rz: 0.62, rx: 0.08, s: 1.05 },
+      { x: 0.14, y: 0.67, z: 0.02, rz: -0.62, rx: 0.08, s: 1.05 },
+      { x: 0.0, y: 0.68, z: 0.08, rz: 0.0, rx: 0.35, s: 0.92 },
+      { x: 0.0, y: 0.71, z: -0.05, rz: 0.0, rx: -0.22, s: 1.0 },
+    ];
+    plumeConfigs.forEach((cfg) => {
+      const plume = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.072 * cfg.s, 0.16 * cfg.s, 12, 16),
+        plumeMat
+      );
+      plume.position.set(cfg.x, cfg.y, cfg.z);
+      plume.rotation.set(cfg.rx, 0, cfg.rz);
+      parent.add(plume);
+    });
+  };
+
+  // ----------------------------------------------------------------------------
+  // 1. HOODIE_KID (Main — 03_hoodie.png)
+  // ----------------------------------------------------------------------------
+  {
+    const tGrp = charTorsoGroups.hoodie_kid;
+    const hGrp = charHeadGroups.hoodie_kid;
+
+    // Bell-shaped yellow-to-aqua gradient hoodie torso
+    const bellTorso = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.32, 0.49, 0.72, 28),
+      hoodieGradMat
+    );
+    bellTorso.position.y = 1.38;
+    tGrp.add(bellTorso);
+
+    const torsoTopDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 24, 16),
+      yellowHoodMat
+    );
+    torsoTopDome.scale.set(1, 0.55, 1);
+    torsoTopDome.position.y = 1.72;
+    tGrp.add(torsoTopDome);
+
+    const torsoBottomCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.49, 0.44, 0.1, 28),
+      aquaHairMat
+    );
+    torsoBottomCap.position.y = 1.0;
+    tGrp.add(torsoBottomCap);
+
+    // Aqua drawstrings with round beads on chest (+Z)
+    [-1, 1].forEach((side) => {
+      const cord = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.022, 0.19, 8, 12),
+        aquaHairMat
+      );
+      cord.position.set(side * 0.075, 1.63, 0.35);
+      cord.rotation.z = side * 0.22;
+      cord.rotation.x = -0.18;
+      tGrp.add(cord);
+
+      const bead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.044, 12, 12),
+        aquaHairMat
+      );
+      bead.position.set(side * 0.098, 1.52, 0.38);
+      tGrp.add(bead);
+    });
+
+    // Oversized cream-yellow outer hood sphere
+    const outerHood = new THREE.Mesh(
+      new THREE.SphereGeometry(0.51, 28, 24),
+      yellowHoodMat
+    );
+    outerHood.scale.set(1.06, 1.02, 1.02);
+    hGrp.add(outerHood);
+
+    // Thick rolled hood opening rim on the front (+Z)
+    const hoodRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.43, 0.078, 16, 32),
+      yellowHoodMat
+    );
+    hoodRim.position.set(0, 0.0, 0.21);
+    hGrp.add(hoodRim);
+
+    // Inner soft pink face sphere
+    const pinkFace = new THREE.Mesh(
+      new THREE.SphereGeometry(0.415, 24, 24),
+      pinkSkinMat
+    );
+    pinkFace.position.set(0, 0.0, 0.07);
+    hGrp.add(pinkFace);
+
+    // Parted glossy aqua-teal bangs inside top of hood
+    [-1, 1].forEach((side) => {
+      const bangLobe = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.125, 0.26, 12, 16),
+        aquaHairMat
+      );
+      bangLobe.position.set(side * 0.17, 0.2, 0.36);
+      bangLobe.rotation.z = side * 1.02;
+      bangLobe.rotation.y = -side * 0.28;
+      bangLobe.scale.set(1.0, 1.0, 0.55);
+      hGrp.add(bangLobe);
+    });
+
+    addBigWhiteBlackEyes(hGrp, 0.44, blushPinkMat);
+  }
+
+  // ----------------------------------------------------------------------------
+  // 2. TOPKNOT_KID (Momo — 01_sprout_smile.png)
+  // ----------------------------------------------------------------------------
+  {
+    const tGrp = charTorsoGroups.topknot_kid;
+    const hGrp = charHeadGroups.topknot_kid;
+
+    // Rounded pink gradient romper torso
+    const romperBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 26, 24),
+      momoRomperMat
+    );
+    romperBody.scale.set(0.96, 1.08, 0.88);
+    romperBody.position.y = 1.38;
+    tGrp.add(romperBody);
+
+    // Pink shoulder trim rings & leg cuff rings
+    [-1, 1].forEach((side) => {
+      const armTrim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.145, 0.036, 12, 20),
+        momoPinkTrimMat
+      );
+      armTrim.rotation.y = Math.PI / 2;
+      armTrim.rotation.x = side * 0.25;
+      armTrim.position.set(side * 0.35, 1.56, 0);
+      tGrp.add(armTrim);
+
+      const legTrim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.155, 0.035, 12, 20),
+        momoPinkTrimMat
+      );
+      legTrim.rotation.x = Math.PI / 2;
+      legTrim.rotation.y = side * 0.25;
+      legTrim.position.set(side * 0.19, 1.04, 0);
+      tGrp.add(legTrim);
+    });
+
+    // Big cream-to-aqua gradient head sphere
+    const headSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.48, 28, 24),
+      momoHeadMat
+    );
+    headSphere.scale.set(1.05, 0.98, 1.0);
+    hGrp.add(headSphere);
+
+    // Happy arched black eyes (◠ ◠)
+    [-1, 1].forEach((side) => {
+      const archEye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.068, 0.022, 10, 20, Math.PI),
+        darkPupilMat
+      );
+      archEye.position.set(side * 0.125, 0.075, 0.455);
+      hGrp.add(archEye);
+    });
+
+    // Cute round coral-orange nose button
+    const nose = new THREE.Mesh(
+      new THREE.SphereGeometry(0.054, 14, 14),
+      momoCoralLipMat
+    );
+    nose.position.set(0, 0.005, 0.49);
+    hGrp.add(nose);
+
+    // Thick puffy coral-orange lips
+    const lips = new THREE.Mesh(
+      new THREE.TorusGeometry(0.095, 0.048, 14, 24),
+      momoCoralLipMat
+    );
+    lips.scale.set(1.35, 0.78, 0.7);
+    lips.position.set(0, -0.11, 0.455);
+    hGrp.add(lips);
+
+    addSproutTopknot(
+      hGrp,
+      createToyMaterial('#F46CE0'),
+      createToyMaterial('#FBB8F0'),
+      sproutPlumeMat
+    );
+  }
+
+  // ----------------------------------------------------------------------------
+  // 3. STARLIGHT_FOX (Coco — 02_peach_xeyes.png)
+  // ----------------------------------------------------------------------------
+  {
+    const tGrp = charTorsoGroups.starlight_fox;
+    const hGrp = charHeadGroups.starlight_fox;
+
+    // Rounded bright teal romper torso
+    const romperBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 26, 24),
+      cocoTealRomperMat
+    );
+    romperBody.scale.set(0.96, 1.08, 0.88);
+    romperBody.position.y = 1.38;
+    tGrp.add(romperBody);
+
+    // Teal shoulder trim rings & leg cuff rings
+    [-1, 1].forEach((side) => {
+      const armTrim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.145, 0.036, 12, 20),
+        cocoTealRomperMat
+      );
+      armTrim.rotation.y = Math.PI / 2;
+      armTrim.rotation.x = side * 0.25;
+      armTrim.position.set(side * 0.35, 1.56, 0);
+      tGrp.add(armTrim);
+
+      const legTrim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.155, 0.035, 12, 20),
+        cocoTealRomperMat
+      );
+      legTrim.rotation.x = Math.PI / 2;
+      legTrim.rotation.y = side * 0.25;
+      legTrim.position.set(side * 0.19, 1.04, 0);
+      tGrp.add(legTrim);
+    });
+
+    // Big warm peach gradient head sphere
+    const headSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.48, 28, 24),
+      cocoHeadMat
+    );
+    headSphere.scale.set(1.05, 0.98, 1.0);
+    hGrp.add(headSphere);
+
+    // Playful 'X X' eyes
+    [-1, 1].forEach((side) => {
+      const xGrp = new THREE.Group();
+      xGrp.position.set(side * 0.13, 0.065, 0.465);
+      const bar1 = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.02, 0.11, 8, 12),
+        darkPupilMat
+      );
+      bar1.rotation.z = Math.PI / 4;
+      const bar2 = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.02, 0.11, 8, 12),
+        darkPupilMat
+      );
+      bar2.rotation.z = -Math.PI / 4;
+      xGrp.add(bar1, bar2);
+      hGrp.add(xGrp);
+    });
+
+    // Big D-shaped open laughing red-pink mouth
+    const mouth = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        0.135,
+        0.135,
+        0.06,
+        24,
+        1,
+        false,
+        0,
+        Math.PI
+      ),
+      cocoMouthMat
+    );
+    mouth.rotation.z = -Math.PI / 2;
+    mouth.rotation.y = Math.PI / 2;
+    mouth.position.set(0, -0.055, 0.445);
+    hGrp.add(mouth);
+
+    addSproutTopknot(
+      hGrp,
+      createToyMaterial('#05B2B2'),
+      createToyMaterial('#12D8D8'),
+      yellowHoodMat
+    );
+  }
+
+  // ----------------------------------------------------------------------------
+  // 4. FLOWER_ORB (Bloom — 04_flower.png)
+  // ----------------------------------------------------------------------------
+  {
+    const tGrp = charTorsoGroups.flower_orb;
+
+    // Giant all-in-one aqua-lavender-pink gradient orb body/head!
+    const giantOrb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.65, 32, 28),
+      bloomOrbMat
+    );
+    giantOrb.scale.set(1.02, 0.98, 0.98);
+    giantOrb.position.set(0, 1.66, 0);
+    tGrp.add(giantOrb);
+
+    // Big glossy black button eyes right on the front of the orb
+    [-1, 1].forEach((side) => {
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.092, 18, 18),
+        darkPupilMat
+      );
+      eye.scale.set(1.0, 1.0, 0.65);
+      eye.position.set(side * 0.155, 1.72, 0.61);
+      tGrp.add(eye);
+
+      const shine = new THREE.Mesh(
+        new THREE.SphereGeometry(0.022, 10, 10),
+        whiteEyeMat
+      );
+      shine.position.set(side * 0.155 - 0.028, 1.75, 0.66);
+      tGrp.add(shine);
+    });
+
+    // Puffy bright yellow duck lips
+    const duckLips = new THREE.Mesh(
+      new THREE.TorusGeometry(0.11, 0.052, 14, 24),
+      bloomYellowLipMat
+    );
+    duckLips.scale.set(1.42, 0.78, 0.75);
+    duckLips.position.set(0, 1.54, 0.61);
+    tGrp.add(duckLips);
+
+    // Top planter rim + 5 green leaves + curved stem + 7-petal pink daisy flower
+    const potRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.22, 0.038, 12, 24),
+      bloomPotRimMat
+    );
+    potRim.rotation.x = Math.PI / 2;
+    potRim.position.set(0, 2.27, 0);
+    tGrp.add(potRim);
+
+    for (let lf = 0; lf < 5; lf++) {
+      const ang = (lf / 5) * Math.PI * 2;
+      const leaf = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.068, 0.16, 10, 14),
+        bloomLeafMat
+      );
+      leaf.position.set(Math.cos(ang) * 0.12, 2.38, Math.sin(ang) * 0.1);
+      leaf.rotation.z = -Math.cos(ang) * 0.55;
+      leaf.rotation.x = Math.sin(ang) * 0.45;
+      tGrp.add(leaf);
+    }
+
+    // Curved green flower stem
+    const stemCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 2.3, 0),
+      new THREE.Vector3(0.02, 2.58, 0.02),
+      new THREE.Vector3(0.1, 2.82, 0.05),
+    ]);
+    const stemMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(stemCurve, 16, 0.034, 10, false),
+      bloomLeafMat
+    );
+    tGrp.add(stemMesh);
+
+    // Tilted 7-petal pink flower with bright yellow center at top of stem
+    const flowerHead = new THREE.Group();
+    flowerHead.position.set(0.12, 2.86, 0.06);
+    flowerHead.rotation.set(0.35, 0.15, -0.32);
+
+    const yellowCenter = new THREE.Mesh(
+      new THREE.SphereGeometry(0.115, 16, 16),
+      bloomYellowLipMat
+    );
+    yellowCenter.scale.set(1.0, 0.65, 1.0);
+    flowerHead.add(yellowCenter);
+
+    for (let p = 0; p < 7; p++) {
+      const a = (p / 7) * Math.PI * 2;
+      const petal = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.078, 0.12, 10, 14),
+        bloomPetalMat
+      );
+      petal.position.set(Math.cos(a) * 0.17, 0, Math.sin(a) * 0.17);
+      petal.rotation.x = Math.PI / 2;
+      petal.rotation.z = -a + Math.PI / 2;
+      petal.scale.set(1.0, 1.0, 0.58);
+      flowerHead.add(petal);
+    }
+    tGrp.add(flowerHead);
+  }
+
+  // ----------------------------------------------------------------------------
+  // 5. MINT_SPRINTER (Mint — 05_beanie.png)
+  // ----------------------------------------------------------------------------
+  {
+    const tGrp = charTorsoGroups.mint_sprinter;
+    const hGrp = charHeadGroups.mint_sprinter;
+
+    // Flared A-line yellow-to-coral gradient tunic dress
+    const tunicMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.49, 0.76, 28),
+      mintTunicMat
+    );
+    tunicMesh.position.y = 1.38;
+    tGrp.add(tunicMesh);
+
+    // Big glossy aqua-teal head sphere
+    const headSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.46, 28, 24),
+      mintTealMat
+    );
+    headSphere.scale.set(1.05, 0.98, 1.0);
+    hGrp.add(headSphere);
+
+    // Cream-yellow dome beanie with thick rolled torus brim
+    const beanieGroup = new THREE.Group();
+    beanieGroup.position.set(0, 0.19, 0);
+    beanieGroup.rotation.z = -0.05;
+    beanieGroup.rotation.x = -0.06;
+
+    const beanieDome = new THREE.Mesh(
+      new THREE.SphereGeometry(
+        0.455,
+        24,
+        18,
+        0,
+        Math.PI * 2,
+        0,
+        Math.PI * 0.55
+      ),
+      mintBeanieMat
+    );
+    beanieDome.scale.set(1.04, 0.92, 1.02);
+    beanieGroup.add(beanieDome);
+
+    const beanieBrim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.43, 0.088, 16, 32),
+      mintBeanieBrimMat
+    );
+    beanieBrim.rotation.x = Math.PI / 2;
+    beanieBrim.scale.set(1.04, 1.02, 0.95);
+    beanieBrim.position.y = 0.04;
+    beanieGroup.add(beanieBrim);
+
+    hGrp.add(beanieGroup);
+
+    addBigWhiteBlackEyes(hGrp, 0.44, blushPinkMat);
+  }
+
+  // ============================================================================
+  // ARTICULATED ARMS (Per-Character Styled Meshes Inside Shared Arm Pivots)
+  // ============================================================================
+  const createArm = (side: -1 | 1) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.44, 1.66, 0);
+
+    const styleGroups: Record<CharacterModelId, THREE.Group> = {
+      hoodie_kid: new THREE.Group(),
+      topknot_kid: new THREE.Group(),
+      starlight_fox: new THREE.Group(),
+      flower_orb: new THREE.Group(),
+      mint_sprinter: new THREE.Group(),
+    };
+
+    // 1. Hoodie Arm (gradient sleeve + pink hand)
+    {
+      const g = styleGroups.hoodie_kid;
+      const sleeve = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.145, 0.44, 16),
+        hoodieGradMat
+      );
+      sleeve.position.set(side * 0.08, -0.22, 0);
+      sleeve.rotation.z = side * 0.32;
+      g.add(sleeve);
+
+      const hand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 14, 14),
+        pinkSkinMat
+      );
+      hand.position.set(side * 0.16, -0.47, 0);
+      g.add(hand);
+    }
+
+    // 2. Momo Arm (curved teal arm + round ball hand)
+    {
+      const g = styleGroups.topknot_kid;
+      const arm = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.085, 0.34, 10, 14),
+        momoTealLimbMat
+      );
+      arm.position.set(side * 0.08, -0.2, 0);
+      arm.rotation.z = side * 0.32;
+      g.add(arm);
+
+      const ballHand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.135, 16, 16),
+        momoTealLimbMat
+      );
+      ballHand.position.set(side * 0.15, -0.42, 0);
+      g.add(ballHand);
+    }
+
+    // 3. Coco Arm (peach arm + round ball hand)
+    {
+      const g = styleGroups.starlight_fox;
+      const arm = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.085, 0.34, 10, 14),
+        cocoPeachLimbMat
+      );
+      arm.position.set(side * 0.08, -0.2, 0);
+      arm.rotation.z = side * 0.35;
+      g.add(arm);
+
+      const ballHand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.135, 16, 16),
+        cocoPeachLimbMat
+      );
+      ballHand.position.set(side * 0.16, -0.42, 0);
+      g.add(ballHand);
+    }
+
+    // 4. Bloom Arm (long pink arm on side of giant orb)
+    {
+      const g = styleGroups.flower_orb;
+      const arm = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.082, 0.56, 10, 14),
+        bloomPinkLimbMat
+      );
+      arm.position.set(side * 0.2, -0.26, 0);
+      arm.rotation.z = side * 0.08;
+      g.add(arm);
+
+      const hand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 14, 14),
+        bloomPinkLimbMat
+      );
+      hand.position.set(side * 0.22, -0.58, 0);
+      g.add(hand);
+    }
+
+    // 5. Mint Beanie Arm (short peach sleeve + teal forearm & hand)
+    {
+      const g = styleGroups.mint_sprinter;
+      const shortSleeve = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.105, 0.135, 0.22, 16),
+        mintSleeveMat
+      );
+      shortSleeve.position.set(side * 0.04, -0.1, 0);
+      shortSleeve.rotation.z = side * 0.35;
+      g.add(shortSleeve);
+
+      const forearm = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.082, 0.24, 10, 14),
+        mintTealMat
+      );
+      forearm.position.set(side * 0.12, -0.28, 0);
+      forearm.rotation.z = side * 0.32;
+      g.add(forearm);
+
+      const hand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 14, 14),
+        mintTealMat
+      );
+      hand.position.set(side * 0.18, -0.44, 0);
+      g.add(hand);
+    }
+
+    (Object.keys(styleGroups) as CharacterModelId[]).forEach((k) => {
+      pivot.add(styleGroups[k]);
+    });
+
+    bodyGroup.add(pivot);
+    return { pivot, styleGroups };
+  };
+
+  const leftArm = createArm(-1);
+  const rightArm = createArm(1);
+
+  // ============================================================================
+  // 2-JOINT ARTICULATED LEGS & CHUNKY BOOTS (Matching Reference Boots & Cuffs)
+  // ============================================================================
   const createArticulatedLeg = (side: -1 | 1) => {
     const hipPivot = new THREE.Group();
-    hipPivot.position.set(side * 0.21, 1.04, 0);
+    hipPivot.position.set(side * 0.18, 1.02, 0);
 
-    // Upper Thigh
-    const thighGeo = new THREE.CapsuleGeometry(0.155, 0.26, 10, 16);
-    const thighMesh = new THREE.Mesh(thighGeo, pantsMat);
-    thighMesh.position.y = -0.2;
-    thighMesh.castShadow = true;
+    const thighMesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.095, 0.24, 10, 16),
+      pinkSkinMat
+    );
+    thighMesh.position.y = -0.18;
     hipPivot.add(thighMesh);
 
-    // Knee Pivot
     const kneePivot = new THREE.Group();
-    kneePivot.position.set(0, -0.4, 0);
+    kneePivot.position.set(0, -0.36, 0);
     hipPivot.add(kneePivot);
 
-    // Lower Shin
-    const shinGeo = new THREE.CapsuleGeometry(0.135, 0.26, 10, 16);
-    const shinMesh = new THREE.Mesh(shinGeo, pantsMat);
-    shinMesh.position.y = -0.2;
-    shinMesh.castShadow = true;
+    const shinMesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.092, 0.22, 10, 16),
+      pinkSkinMat
+    );
+    shinMesh.position.y = -0.16;
     kneePivot.add(shinMesh);
 
-    // Felt Sneaker (pointing forward along +Z)
-    const shoeGeo = new THREE.CapsuleGeometry(0.145, 0.24, 10, 16);
-    const shoeMesh = new THREE.Mesh(shoeGeo, shoeMat);
-    shoeMesh.rotation.x = Math.PI / 2;
-    shoeMesh.position.set(0, -0.42, 0.09);
-    shoeMesh.castShadow = true;
-    kneePivot.add(shoeMesh);
+    // Ankle Cuff Ring (Yellow on Hoodie/Momo/Coco/Mint, Teal on Bloom)
+    const cuffRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.115, 0.034, 12, 20),
+      yellowCuffMat
+    );
+    cuffRing.rotation.x = Math.PI / 2;
+    cuffRing.position.set(0, -0.28, 0);
+    kneePivot.add(cuffRing);
+
+    // Chunky Glossy Boot Shaft + Rounded Toe Box + Sole Rim
+    const bootShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.125, 0.14, 0.2, 18),
+      aquaBootMat
+    );
+    bootShaft.position.set(0, -0.39, 0);
+    kneePivot.add(bootShaft);
+
+    const bootToe = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.135, 0.18, 12, 18),
+      aquaBootMat
+    );
+    bootToe.rotation.x = Math.PI / 2;
+    bootToe.scale.set(1.08, 1.0, 0.85);
+    bootToe.position.set(0, -0.45, 0.075);
+    kneePivot.add(bootToe);
 
     bodyGroup.add(hipPivot);
-    return { hipPivot, kneePivot };
+    return {
+      hipPivot,
+      kneePivot,
+      thighMesh,
+      shinMesh,
+      cuffRing,
+      bootShaft,
+      bootToe,
+    };
   };
 
   const leftLeg = createArticulatedLeg(-1);
@@ -520,109 +1156,66 @@ export function createFeltRunnerRig(
 
   let currentCharId: CharacterModelId = initialCharacter;
 
-  const CHAR_OUTFITS: Record<
-    CharacterModelId,
-    {
-      skin: string;
-      sweater: string;
-      collar: string;
-      pants: string;
-      shoe: string;
-      hat: string;
-    }
-  > = {
-    // 1. Mint (Image 1: Teal head/limbs, beige bucket hat, peach-coral tunic, coral boots)
-    mint_sprinter: {
-      skin: '#0FB5BA',
-      sweater: '#F5A66B',
-      collar: '#EC7E6D',
-      pants: '#0FB5BA',
-      shoe: '#EC836D',
-      hat: '#EED09D',
-    },
-    // 2. Bloom (Image 2: Aqua-lavender-pink orb, sprouting flower, pink limbs, pink-aqua boots)
-    flower_orb: {
-      skin: '#5BE2D8',
-      sweater: '#F86CC8',
-      collar: '#5BE2D8',
-      pants: '#FCA5E0',
-      shoe: '#E87AD8',
-      hat: '#F779E6',
-    },
-    // 3. Momo (Image 3: Cream-to-aqua head, pink romper, teal limbs, pink boots)
-    topknot_kid: {
-      skin: '#BEE3C8',
-      sweater: '#F39CE0',
-      collar: '#F497DA',
-      pants: '#1FC8B5',
-      shoe: '#EE99E2',
-      hat: '#EDE8B8',
-    },
-    // 4. Sunny (Image 4: Pink face, cozy yellow-to-aqua hoodie, pink legs, aqua boots)
-    hoodie_kid: {
-      skin: '#F5B1B3',
-      sweater: '#FCE192',
-      collar: '#18C5C4',
-      pants: '#F5B1B3',
-      shoe: '#18C5C4',
-      hat: '#FCE192',
-    },
-    // 5. Coco (Image 5: Warm peach head, X-eyes, teal romper, pink limbs, coral shoes)
-    starlight_fox: {
-      skin: '#F5B882',
-      sweater: '#0FB8B9',
-      collar: '#10B8B9',
-      pants: '#F5B1B3',
-      shoe: '#EF8A6B',
-      hat: '#F6D48F',
-    },
-  };
-
   const setCharacterModel = (modelId: CharacterModelId) => {
     currentCharId = modelId;
-    // Both hoodie_kid (Sunny) and mint_sprinter (Mint) wear the rounded dome hat/hood
-    hatGroup.visible = modelId === 'hoodie_kid' || modelId === 'mint_sprinter';
-    flowerCrownGroup.visible = modelId === 'flower_orb';
-    topknotGroup.visible =
-      modelId === 'topknot_kid' || modelId === 'starlight_fox';
-    mintVisorGroup.visible = false;
-    foxEarsGroup.visible = false;
 
-    const outfit = CHAR_OUTFITS[modelId] || CHAR_OUTFITS.hoodie_kid;
-    skinMat.color.set(outfit.skin);
-    sweaterMat.color.set(outfit.sweater);
-    sweaterMat.emissive.set(outfit.sweater);
-    collarMat.color.set(outfit.collar);
-    collarMat.emissive.set(outfit.collar);
-    pantsMat.color.set(outfit.pants);
-    pantsMat.emissive.set(outfit.pants);
-    shoeMat.color.set(outfit.shoe);
-    shoeMat.emissive.set(outfit.shoe);
-    hatMat.color.set(outfit.hat);
-    hatMat.emissive.set(outfit.hat);
-    bunMat.color.set(outfit.hat);
-    bunMat.emissive.set(outfit.hat);
+    (Object.keys(charTorsoGroups) as CharacterModelId[]).forEach((k) => {
+      const active = k === modelId;
+      charTorsoGroups[k].visible = active;
+      charHeadGroups[k].visible = active;
+      leftArm.styleGroups[k].visible = active;
+      rightArm.styleGroups[k].visible = active;
+    });
+
+    // Apply per-character leg, ankle cuff, and boot materials
+    const legSkinByChar: Record<CharacterModelId, THREE.Material> = {
+      hoodie_kid: pinkSkinMat,
+      topknot_kid: momoTealLimbMat,
+      starlight_fox: cocoPeachLimbMat,
+      flower_orb: bloomPinkLimbMat,
+      mint_sprinter: mintTealMat,
+    };
+    const cuffByChar: Record<CharacterModelId, THREE.Material> = {
+      hoodie_kid: yellowCuffMat,
+      topknot_kid: yellowCuffMat,
+      starlight_fox: yellowCuffMat,
+      flower_orb: bloomPotRimMat,
+      mint_sprinter: yellowCuffMat,
+    };
+    const bootByChar: Record<CharacterModelId, THREE.Material> = {
+      hoodie_kid: aquaBootMat,
+      topknot_kid: momoPinkBootMat,
+      starlight_fox: cocoCoralBootMat,
+      flower_orb: bloomBootMat,
+      mint_sprinter: mintBootMat,
+    };
+
+    [leftLeg, rightLeg].forEach((leg) => {
+      leg.thighMesh.material = legSkinByChar[modelId];
+      leg.shinMesh.material = legSkinByChar[modelId];
+      leg.cuffRing.material = cuffByChar[modelId];
+      leg.bootShaft.material = bootByChar[modelId];
+      leg.bootToe.material = bootByChar[modelId];
+    });
   };
 
   const updateThemeStyle = (
-    theme: ArtworkThemeConfig,
+    _theme: ArtworkThemeConfig,
     themeId: ArtworkThemeId
   ) => {
-    const outfit = CHAR_OUTFITS[currentCharId];
-    if (!outfit) {
-      sweaterMat.color.set(theme.runnerSweaterHex);
-      sweaterMat.emissive.set(theme.runnerSweaterHex);
-      pantsMat.color.set(theme.runnerPantsHex);
-      pantsMat.emissive.set(theme.runnerPantsHex);
-      hatMat.color.set(theme.runnerHatHex);
-      hatMat.emissive.set(theme.runnerHatHex);
-    }
-
     fishCompanionGroup.visible =
       themeId === 'riverside' ||
       themeId === 'cloud' ||
       currentCharId === 'flower_orb';
   };
+
+  // Ensure shadows are enabled on all character parts
+  bodyGroup.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    }
+  });
 
   setCharacterModel(initialCharacter);
   updateThemeStyle(initialTheme, initialTheme.id);
@@ -631,8 +1224,8 @@ export function createFeltRunnerRig(
     root,
     bodyGroup,
     headGroup,
-    leftArmPivot,
-    rightArmPivot,
+    leftArmPivot: leftArm.pivot,
+    rightArmPivot: rightArm.pivot,
     leftLegPivot: leftLeg.hipPivot,
     rightLegPivot: rightLeg.hipPivot,
     leftKneePivot: leftLeg.kneePivot,

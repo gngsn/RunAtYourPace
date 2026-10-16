@@ -38,24 +38,14 @@ export interface CharacterMeta {
 
 export const FIVE_CHARACTERS: CharacterMeta[] = [
   {
-    id: 'mint_sprinter',
-    name: 'Mint',
-    role: 'Teal Bucket-Hat Walker',
-    perk: 'Turquoise character with beige bucket hat & coral tunic',
-    primaryHex: '#0FB5BA',
-    secondaryHex: '#F6B76B',
-    hatHex: '#EED09D',
-    bgHex: '#79C2E6',
-  },
-  {
-    id: 'flower_orb',
-    name: 'Bloom',
-    role: 'Flower Planter Orb',
-    perk: 'Aqua-to-pink gradient orb with sprouting pink flower',
-    primaryHex: '#5BE2D8',
-    secondaryHex: '#F86CC8',
-    hatHex: '#F779E6',
-    bgHex: '#E8C5A5',
+    id: 'hoodie_kid',
+    name: 'Hoodie',
+    role: 'Cozy Yellow Hoodie (Main)',
+    perk: 'Yellow-to-aqua hoodie with teal bangs & drawstrings',
+    primaryHex: '#FCE192',
+    secondaryHex: '#1CC7C6',
+    hatHex: '#FCE192',
+    bgHex: '#FFFFFF',
   },
   {
     id: 'topknot_kid',
@@ -65,17 +55,7 @@ export const FIVE_CHARACTERS: CharacterMeta[] = [
     primaryHex: '#F5A3E0',
     secondaryHex: '#1FC8B5',
     hatHex: '#EDE8B8',
-    bgHex: '#CE9CE8',
-  },
-  {
-    id: 'hoodie_kid',
-    name: 'Sunny',
-    role: 'Cozy Yellow Hoodie',
-    perk: 'Yellow-to-aqua hoodie with teal bangs & drawstrings',
-    primaryHex: '#FCE192',
-    secondaryHex: '#1CC7C6',
-    hatHex: '#FCE192',
-    bgHex: '#7CC8F2',
+    bgHex: '#FFFFFF',
   },
   {
     id: 'starlight_fox',
@@ -85,12 +65,32 @@ export const FIVE_CHARACTERS: CharacterMeta[] = [
     primaryHex: '#F7C58E',
     secondaryHex: '#0FB8B9',
     hatHex: '#F6D48F',
-    bgHex: '#79C9F2',
+    bgHex: '#FFFFFF',
+  },
+  {
+    id: 'flower_orb',
+    name: 'Bloom',
+    role: 'Flower Planter Orb',
+    perk: 'Aqua-to-pink gradient orb with sprouting pink flower',
+    primaryHex: '#5BE2D8',
+    secondaryHex: '#F86CC8',
+    hatHex: '#F779E6',
+    bgHex: '#FFFFFF',
+  },
+  {
+    id: 'mint_sprinter',
+    name: 'Mint',
+    role: 'Beanie Tunic Kid',
+    perk: 'Turquoise character with rolled beanie & coral tunic',
+    primaryHex: '#06BFC4',
+    secondaryHex: '#F6B76B',
+    hatHex: '#FDE29C',
+    bgHex: '#FFFFFF',
   },
 ];
 
 /**
- * 3D-shaded full-character illustration matching each of the 5 attached 3D character images
+ * 3D-shaded full-character illustration matching each of the 5 attached cutout character images
  */
 export const Character3DThumbnail: React.FC<{
   char: CharacterMeta;
@@ -101,349 +101,382 @@ export const Character3DThumbnail: React.FC<{
     <svg
       width={size}
       height={size}
-      viewBox="0 0 100 112"
+      viewBox="0 0 100 116"
       className="shrink-0 rounded-2xl overflow-hidden shadow-md"
     >
       <defs>
         {/* Soft 3D Specular Highlight Overlay */}
         <radialGradient id={`${uid}-shine`} cx="32%" cy="26%" r="68%">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.52" />
-          <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.08" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.18" />
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.48" />
+          <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.06" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.14" />
         </radialGradient>
 
-        {/* 1. Mint (Teal head + beige hat + peach-coral tunic) gradients */}
-        <radialGradient id={`${uid}-teal`} cx="35%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#5CE6E9" />
-          <stop offset="55%" stopColor="#0FB5BA" />
-          <stop offset="100%" stopColor="#087E84" />
-        </radialGradient>
-        <linearGradient id={`${uid}-tunic`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#F7C97E" />
-          <stop offset="55%" stopColor="#F5A66B" />
-          <stop offset="100%" stopColor="#EC7E6D" />
-        </linearGradient>
-        <linearGradient id={`${uid}-hat`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#F8E2B8" />
-          <stop offset="100%" stopColor="#DEC08A" />
-        </linearGradient>
-
-        {/* 2. Bloom (Aqua-lavender-pink orb + flower) gradients */}
-        <linearGradient id={`${uid}-orb`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#5BE2D8" />
-          <stop offset="48%" stopColor="#C8B6F6" />
-          <stop offset="100%" stopColor="#F85CC4" />
-        </linearGradient>
-
-        {/* 3. Momo (Cream-to-aqua head + pink romper) gradients */}
-        <linearGradient id={`${uid}-momo-head`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#F3E8BC" />
-          <stop offset="60%" stopColor="#BEE3C8" />
-          <stop offset="100%" stopColor="#26C2BE" />
-        </linearGradient>
-        <linearGradient id={`${uid}-momo-body`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FAD0EC" />
-          <stop offset="60%" stopColor="#F39CE0" />
-          <stop offset="100%" stopColor="#DA5BD2" />
-        </linearGradient>
-
-        {/* 4. Sunny (Yellow-to-aqua hoodie + pink face) gradients */}
+        {/* 1. Hoodie (Yellow-to-aqua hoodie + pink face) gradients */}
         <linearGradient id={`${uid}-hoodie`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FDE59B" />
-          <stop offset="62%" stopColor="#EFE3A7" />
-          <stop offset="100%" stopColor="#12C4C3" />
+          <stop offset="0%" stopColor="#FFF0A8" />
+          <stop offset="52%" stopColor="#F2E8A6" />
+          <stop offset="85%" stopColor="#26D8CB" />
+          <stop offset="100%" stopColor="#05C2C4" />
         </linearGradient>
         <radialGradient id={`${uid}-pink-skin`} cx="35%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#FFD6D6" />
-          <stop offset="65%" stopColor="#F5B1B3" />
-          <stop offset="100%" stopColor="#E09397" />
+          <stop offset="0%" stopColor="#FFD8D6" />
+          <stop offset="65%" stopColor="#FBBAB6" />
+          <stop offset="100%" stopColor="#E69A98" />
         </radialGradient>
 
-        {/* 5. Coco (Peach head + teal romper) gradients */}
+        {/* 2. Momo (Cream-to-aqua head + pink romper) gradients */}
+        <linearGradient id={`${uid}-momo-head`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FEF2BA" />
+          <stop offset="55%" stopColor="#C5ECC8" />
+          <stop offset="100%" stopColor="#09BFC0" />
+        </linearGradient>
+        <linearGradient id={`${uid}-momo-body`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FCDAD8" />
+          <stop offset="50%" stopColor="#FAA8E4" />
+          <stop offset="100%" stopColor="#F25CE0" />
+        </linearGradient>
+
+        {/* 3. Coco (Peach head + teal romper) gradients */}
         <radialGradient id={`${uid}-peach`} cx="35%" cy="28%" r="72%">
-          <stop offset="0%" stopColor="#FBE0B4" />
-          <stop offset="60%" stopColor="#F5B882" />
-          <stop offset="100%" stopColor="#EC8C6B" />
+          <stop offset="0%" stopColor="#FDE4AF" />
+          <stop offset="60%" stopColor="#FAB88A" />
+          <stop offset="100%" stopColor="#F4956E" />
         </radialGradient>
+
+        {/* 4. Bloom (Aqua-lavender-pink orb + flower) gradients */}
+        <linearGradient id={`${uid}-orb`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#42F2D6" />
+          <stop offset="48%" stopColor="#C4B2F8" />
+          <stop offset="100%" stopColor="#FF42BF" />
+        </linearGradient>
+        <linearGradient id={`${uid}-bloom-boot`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#7CD4F8" />
+          <stop offset="50%" stopColor="#C4A8F8" />
+          <stop offset="100%" stopColor="#FF5AD0" />
+        </linearGradient>
+
+        {/* 5. Mint (Teal head + rolled beanie + peach-coral tunic) gradients */}
+        <radialGradient id={`${uid}-teal`} cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#4CE8EC" />
+          <stop offset="55%" stopColor="#06BFC4" />
+          <stop offset="100%" stopColor="#048E94" />
+        </radialGradient>
+        <linearGradient id={`${uid}-tunic`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FECA6A" />
+          <stop offset="58%" stopColor="#FCA46C" />
+          <stop offset="100%" stopColor="#FA7A72" />
+        </linearGradient>
+        <linearGradient id={`${uid}-hat`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFF0B8" />
+          <stop offset="100%" stopColor="#F8D27C" />
+        </linearGradient>
       </defs>
 
-      {/* Studio Backdrop matching each reference photo */}
-      <rect width="100" height="112" rx="16" fill={char.bgHex} />
-      <ellipse cx="50" cy="103" rx="28" ry="4.5" fill="rgba(0,0,0,0.12)" />
+      {/* Clean White Studio Cutout Backdrop matching the 5 attached PNGs */}
+      <rect width="100" height="116" rx="16" fill={char.bgHex} />
+      <ellipse cx="50" cy="108" rx="26" ry="3.8" fill="rgba(0,0,0,0.08)" />
 
       {/* =====================================================================
-       * CHARACTER 1: MINT (Image 1 - Teal head, beige bucket hat, peach tunic)
+       * CHARACTER 1 (MAIN): HOODIE (03_hoodie.png)
        * =================================================================== */}
-      {char.id === 'mint_sprinter' && (
+      {char.id === 'hoodie_kid' && (
         <g>
-          {/* Teal Legs & Coral Boots */}
-          <rect x="38" y="78" width="7.5" height="17" rx="3.5" fill="#0CA2A7" />
-          <rect x="53" y="78" width="7.5" height="17" rx="3.5" fill="#0FB5BA" />
-          <path d="M 35 92 H 48 V 101 C 48 103, 33 103, 33 99 Z" fill="#EC836D" />
-          <rect x="36" y="90" width="11" height="3.5" rx="1.5" fill="#F5C078" />
-          <path d="M 51 92 H 66 C 68 92, 69 101, 66 102 H 51 Z" fill="#EC836D" />
-          <rect x="51" y="90" width="11" height="3.5" rx="1.5" fill="#F5C078" />
+          {/* Pink Legs, Yellow Ankle Cuffs & Chunky Aqua Boots */}
+          <rect x="39.5" y="79" width="6.5" height="16" rx="3" fill="#FBBAB6" />
+          <rect x="54" y="79" width="6.5" height="16" rx="3" fill="#FBBAB6" />
+          <rect x="37.5" y="91" width="10.5" height="3.5" rx="1.7" fill="#FDE69E" />
+          <rect x="52" y="91" width="10.5" height="3.5" rx="1.7" fill="#FDE69E" />
+          <path d="M 31 94 H 48 V 105 C 48 107, 29 107, 30 99 Z" fill="#1EE0D2" />
+          <path d="M 52 94 H 69 C 71 99, 70 107, 52 105 Z" fill="#1EE0D2" />
 
-          {/* Bell-shaped Peach-to-Coral Tunic */}
+          {/* Gradient Hoodie Sleeves & Pink Hands */}
           <path
-            d="M 34 55 C 27 63, 25 81, 30 83 H 70 C 75 81, 73 63, 66 55 Z"
-            fill={`url(#${uid}-tunic)`}
-          />
-          {/* Short Sleeve & Teal Arm */}
-          <rect x="44" y="55" width="11" height="9" rx="4.5" fill="#F5A66B" />
-          <path
-            d="M 46 62 L 44 74 M 46 62 L 49 75 M 46 62 L 53 72"
-            stroke="#0FB5BA"
-            strokeWidth="5"
+            d="M 32 58 L 22 76 M 68 58 L 78 76"
+            stroke={`url(#${uid}-hoodie)`}
+            strokeWidth="9.5"
             strokeLinecap="round"
           />
+          <circle cx="21" cy="80" r="4.2" fill="#FBBAB6" />
+          <circle cx="79" cy="80" r="4.2" fill="#FBBAB6" />
 
-          {/* Big Round Teal Head */}
-          <circle cx="50" cy="37" r="21" fill={`url(#${uid}-teal)`} />
-
-          {/* Eyes, Cheeks & Smile */}
-          <ellipse cx="44" cy="38" rx="4.6" ry="5.2" fill="#FFFFFF" />
-          <ellipse cx="57" cy="38" rx="4.6" ry="5.2" fill="#FFFFFF" />
-          <circle cx="44.5" cy="38.5" r="3" fill="#17253B" />
-          <circle cx="57.5" cy="38.5" r="3" fill="#17253B" />
-          <circle cx="43.5" cy="37" r="1" fill="#FFFFFF" />
-          <circle cx="56.5" cy="37" r="1" fill="#FFFFFF" />
-          <ellipse cx="37" cy="43.5" rx="4.2" ry="2.5" fill="#EF9DB6" />
-          <ellipse cx="63" cy="43.5" rx="4.2" ry="2.5" fill="#EF9DB6" />
+          {/* Bell-Shaped Yellow-to-Aqua Hoodie Torso */}
           <path
-            d="M 47.5 43.5 Q 51 47.5 54.5 43.5"
-            stroke="#17253B"
+            d="M 32 54 C 26 62, 26 80, 31 82 H 69 C 74 80, 74 62, 68 54 Z"
+            fill={`url(#${uid}-hoodie)`}
+          />
+
+          {/* Outer Oversized Cream-Yellow Hood */}
+          <circle cx="50" cy="36" r="23.5" fill="#FDE69E" />
+          {/* Inner Soft Pink Face */}
+          <circle cx="50" cy="37" r="18" fill={`url(#${uid}-pink-skin)`} />
+          {/* Parted Glossy Aqua-Teal Bangs */}
+          <path
+            d="M 32 35 C 34 20, 48 18, 50 22 C 52 18, 66 20, 68 35 C 61 31, 54 27, 50 22 C 46 27, 39 31, 32 35 Z"
+            fill="#10D4C6"
+          />
+
+          {/* Big White Eyes, Black Pupils, Pink Cheeks & Smile */}
+          <circle cx="43.5" cy="38" r="5" fill="#FFFFFF" />
+          <circle cx="56.5" cy="38" r="5" fill="#FFFFFF" />
+          <circle cx="43.5" cy="38" r="3.4" fill="#18181B" />
+          <circle cx="56.5" cy="38" r="3.4" fill="#18181B" />
+          <circle cx="42.3" cy="36.8" r="1.1" fill="#FFFFFF" />
+          <circle cx="55.3" cy="36.8" r="1.1" fill="#FFFFFF" />
+          <ellipse cx="37.5" cy="43" rx="4.2" ry="2.4" fill="#F68BA2" />
+          <ellipse cx="62.5" cy="43" rx="4.2" ry="2.4" fill="#F68BA2" />
+          <path
+            d="M 46.8 43.2 Q 50 46.8 53.2 43.2"
+            stroke="#18181B"
+            strokeWidth="2.3"
+            strokeLinecap="round"
+            fill="none"
+          />
+
+          {/* Aqua Hoodie Drawstrings with Round Beads */}
+          <path
+            d="M 47 56 L 44 65 M 53 56 L 56 65"
+            stroke="#0FD0C6"
             strokeWidth="2.2"
             strokeLinecap="round"
-            fill="none"
           />
-
-          {/* Beige Dome Bucket Hat */}
-          <path
-            d="M 31 22 C 32 9, 68 9, 69 22 Z"
-            fill={`url(#${uid}-hat)`}
-          />
-          <rect x="27" y="19" width="46" height="6.5" rx="3.2" fill={`url(#${uid}-hat)`} />
+          <circle cx="44" cy="65.5" r="2.3" fill="#0FD0C6" />
+          <circle cx="56" cy="65.5" r="2.3" fill="#0FD0C6" />
         </g>
       )}
 
       {/* =====================================================================
-       * CHARACTER 2: BLOOM (Image 2 - Gradient Orb with Top Sprout & Pink Flower)
-       * =================================================================== */}
-      {char.id === 'flower_orb' && (
-        <g>
-          {/* Pink Legs & Gradient Boots */}
-          <rect x="38" y="76" width="6.5" height="19" rx="3" fill="#FCA5E0" />
-          <rect x="55" y="76" width="6.5" height="19" rx="3" fill="#FCA5E0" />
-          <path d="M 32 94 H 46 V 101 C 46 103, 31 103, 32 94 Z" fill="#E87AD8" />
-          <path d="M 54 94 H 68 C 69 103, 54 103, 54 101 Z" fill="#E87AD8" />
-          <rect x="37" y="92.5" width="8.5" height="2.5" rx="1.2" fill="#5BE2D8" />
-          <rect x="54.5" y="92.5" width="8.5" height="2.5" rx="1.2" fill="#5BE2D8" />
-
-          {/* Side Pink Arms */}
-          <path
-            d="M 22 48 L 17 75 M 78 48 L 83 75"
-            stroke="#FCA5E0"
-            strokeWidth="5.5"
-            strokeLinecap="round"
-          />
-
-          {/* Main Gradient Orb Body */}
-          <circle cx="50" cy="54" r="28" fill={`url(#${uid}-orb)`} />
-          <circle cx="50" cy="54" r="28" fill={`url(#${uid}-shine)`} />
-
-          {/* Green Leaves & Pink Flower on Top */}
-          <ellipse cx="43" cy="27" rx="4" ry="7" transform="rotate(-28 43 27)" fill="#06D6A0" />
-          <ellipse cx="50" cy="25" rx="4" ry="8" fill="#10B981" />
-          <ellipse cx="57" cy="27" rx="4" ry="7" transform="rotate(28 57 27)" fill="#06D6A0" />
-          <path
-            d="M 50 25 Q 52 14 58 12"
-            stroke="#06D6A0"
-            strokeWidth="2.5"
-            fill="none"
-          />
-          {/* Flower Petals */}
-          <g transform="translate(60, 12)">
-            <circle cx="-5" cy="-2" r="3.8" fill="#F779E6" />
-            <circle cx="5" cy="-2" r="3.8" fill="#F779E6" />
-            <circle cx="-3" cy="4" r="3.8" fill="#E85BD8" />
-            <circle cx="3" cy="4" r="3.8" fill="#E85BD8" />
-            <circle cx="0" cy="-5" r="3.8" fill="#F779E6" />
-            <circle cx="0" cy="0" r="3.5" fill="#FACC15" />
-          </g>
-
-          {/* Glossy Dark Eyes & Thick Yellow Duck Lips */}
-          <circle cx="42.5" cy="50" r="4.8" fill="#27242C" />
-          <circle cx="57.5" cy="50" r="4.8" fill="#27242C" />
-          <circle cx="41" cy="48.5" r="1.3" fill="#FFFFFF" opacity="0.8" />
-          <circle cx="56" cy="48.5" r="1.3" fill="#FFFFFF" opacity="0.8" />
-          <rect x="41" y="56.5" width="18" height="8.5" rx="4.2" fill="#FACC15" />
-          <path d="M 44 60.8 Q 50 62.5 56 60.8" stroke="#CA8A04" strokeWidth="1.4" fill="none" />
-        </g>
-      )}
-
-      {/* =====================================================================
-       * CHARACTER 3: MOMO (Image 3 - Sprout Topknot, Arch Eyes, Pink Romper)
+       * CHARACTER 2: MOMO (01_sprout_smile.png)
        * =================================================================== */}
       {char.id === 'topknot_kid' && (
         <g>
-          {/* Teal Legs & Pink Boots */}
-          <rect x="39" y="79" width="6" height="15" rx="3" fill="#1FC8B5" />
-          <rect x="55" y="79" width="6" height="15" rx="3" fill="#1FC8B5" />
-          <path d="M 34 92 H 46 V 100 H 34 Z" fill="#EE99E2" />
-          <path d="M 54 92 H 66 V 100 H 54 Z" fill="#EE99E2" />
-          <rect x="38" y="90" width="8" height="2.5" rx="1" fill="#FDE047" />
-          <rect x="54" y="90" width="8" height="2.5" rx="1" fill="#FDE047" />
+          {/* Teal Legs, Yellow Ankle Cuffs & Chunky Pink Boots */}
+          <rect x="39" y="80" width="6.2" height="16" rx="3" fill="#08C6B8" />
+          <rect x="54.8" y="80" width="6.2" height="16" rx="3" fill="#08C6B8" />
+          <rect x="37.2" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#FBE196" />
+          <rect x="53" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#FBE196" />
+          <path d="M 31 94.5 H 47 V 105 C 47 107, 29 107, 30 99 Z" fill="#F68CE4" />
+          <path d="M 53 94.5 H 69 C 71 99, 70 107, 53 105 Z" fill="#F68CE4" />
 
-          {/* Curved Teal Arms */}
+          {/* Curved Teal Arms & Round Ball Hands */}
           <path
-            d="M 35 61 Q 23 65 25 75 M 65 61 Q 77 65 75 75"
-            stroke="#1FC8B5"
+            d="M 34 62 Q 21 66 23 77 M 66 62 Q 79 66 77 77"
+            stroke="#08C6B8"
             strokeWidth="6.5"
             strokeLinecap="round"
             fill="none"
           />
+          <circle cx="23" cy="79" r="5" fill="#08C6B8" />
+          <circle cx="77" cy="79" r="5" fill="#08C6B8" />
 
-          {/* Rounded Pink Romper Body */}
+          {/* Rounded Pink Romper Body + Shoulder & Leg Trim Rings */}
           <circle cx="50" cy="69" r="15.5" fill={`url(#${uid}-momo-body)`} />
+          <rect x="32.5" y="57" width="4" height="11" rx="2" fill="#F9A8E8" />
+          <rect x="63.5" y="57" width="4" height="11" rx="2" fill="#F9A8E8" />
+          <rect x="37" y="79" width="9" height="3.2" rx="1.6" fill="#F9A8E8" />
+          <rect x="54" y="79" width="9" height="3.2" rx="1.6" fill="#F9A8E8" />
 
           {/* Topknot Sprout Plumes & Pink Double Hairband */}
-          <ellipse cx="43" cy="14" rx="5.5" ry="3.2" transform="rotate(25 43 14)" fill="#EDE8B8" />
-          <ellipse cx="57" cy="14" rx="5.5" ry="3.2" transform="rotate(-25 57 14)" fill="#EDE8B8" />
-          <ellipse cx="50" cy="13" rx="3.5" ry="5.5" fill="#A7F3D0" />
-          <rect x="42" y="17.5" width="16" height="3.5" rx="1.7" fill="#F497DA" />
-          <rect x="42" y="21" width="16" height="3.5" rx="1.7" fill="#EC6BD0" />
+          <ellipse cx="41" cy="13.5" rx="7" ry="3.6" transform="rotate(24 41 13.5)" fill="#FEEEA4" />
+          <ellipse cx="59" cy="13.5" rx="7" ry="3.6" transform="rotate(-24 59 13.5)" fill="#FEEEA4" />
+          <ellipse cx="50" cy="12.5" rx="4" ry="6.2" fill="#D4EBB8" />
+          <rect x="41" y="17.5" width="18" height="3.6" rx="1.8" fill="#FBB8F0" />
+          <rect x="41" y="21" width="18" height="3.6" rx="1.8" fill="#F46CE0" />
 
           {/* Cream-to-Aqua Round Head */}
-          <circle cx="50" cy="40" r="19" fill={`url(#${uid}-momo-head)`} />
+          <circle cx="50" cy="41" r="20" fill={`url(#${uid}-momo-head)`} />
 
-          {/* Happy Arch Eyes, Round Coral Nose & Thick Coral Lips */}
+          {/* Happy Arch Eyes, Round Coral Nose & Thick Puffy Coral Lips */}
           <path
-            d="M 41 37 Q 44.5 32.5 48 37 M 52 37 Q 55.5 32.5 59 37"
-            stroke="#27242C"
-            strokeWidth="2.6"
+            d="M 40.5 37.5 Q 44.5 32.5 48.5 37.5 M 51.5 37.5 Q 55.5 32.5 59.5 37.5"
+            stroke="#18181B"
+            strokeWidth="2.8"
             strokeLinecap="round"
             fill="none"
           />
-          <circle cx="50" cy="40.5" r="2.7" fill="#F97E6B" />
-          <rect x="42" y="44" width="16" height="8" rx="4" fill="#F97E6B" />
-          <path d="M 45 48 Q 50 49.5 55 48" stroke="#9A3412" strokeWidth="1.3" fill="none" />
+          <circle cx="50" cy="41" r="2.9" fill="#FC8E62" />
+          <rect x="41.5" y="44.5" width="17" height="8.5" rx="4.2" fill="#FC8E62" />
+          <path d="M 44.5 48.8 Q 50 50.5 55.5 48.8" stroke="#9A3412" strokeWidth="1.4" fill="none" />
         </g>
       )}
 
       {/* =====================================================================
-       * CHARACTER 4: SUNNY (Image 4 - Cozy Yellow-to-Aqua Hoodie & Teal Bangs)
-       * =================================================================== */}
-      {char.id === 'hoodie_kid' && (
-        <g>
-          {/* Pink Legs & Aqua Boots */}
-          <rect x="41" y="77" width="5.5" height="16" rx="2.5" fill="#F5B1B3" />
-          <rect x="53.5" y="77" width="5.5" height="16" rx="2.5" fill="#F5B1B3" />
-          <path d="M 37 91 H 47.5 V 100 H 37 Z" fill="#18C5C4" />
-          <path d="M 52.5 91 H 63 V 100 H 52.5 Z" fill="#18C5C4" />
-
-          {/* Hoodie Sleeves & Pink Hands */}
-          <path
-            d="M 33 55 L 25 71 M 67 55 L 75 71"
-            stroke={`url(#${uid}-hoodie)`}
-            strokeWidth="8.5"
-            strokeLinecap="round"
-          />
-          <circle cx="24" cy="74" r="3.5" fill="#F5B1B3" />
-          <circle cx="76" cy="74" r="3.5" fill="#F5B1B3" />
-
-          {/* Bell-Shaped Yellow-to-Aqua Hoodie Torso */}
-          <path
-            d="M 33 52 C 28 60, 28 77, 33 78 H 67 C 72 77, 72 60, 67 52 Z"
-            fill={`url(#${uid}-hoodie)`}
-          />
-
-          {/* Outer Yellow Hood */}
-          <circle cx="50" cy="34" r="22" fill="#FCE192" />
-          {/* Inner Pink Face */}
-          <circle cx="50" cy="35" r="16.5" fill={`url(#${uid}-pink-skin)`} />
-          {/* Parted Teal Bangs */}
-          <path
-            d="M 33.5 33 C 35 20, 48 18, 50 22 C 52 18, 65 20, 66.5 33 C 60 29, 53 26, 50 22 C 47 26, 40 29, 33.5 33 Z"
-            fill="#19C6C4"
-          />
-
-          {/* Big White Eyes, Cheeks & Smile */}
-          <circle cx="44" cy="36" r="4.5" fill="#FFFFFF" />
-          <circle cx="56" cy="36" r="4.5" fill="#FFFFFF" />
-          <circle cx="44" cy="36" r="2.8" fill="#1E293B" />
-          <circle cx="56" cy="36" r="2.8" fill="#1E293B" />
-          <circle cx="43" cy="35" r="0.9" fill="#FFFFFF" />
-          <circle cx="55" cy="35" r="0.9" fill="#FFFFFF" />
-          <ellipse cx="38" cy="40.5" rx="3.8" ry="2.2" fill="#F28CA3" />
-          <ellipse cx="62" cy="40.5" rx="3.8" ry="2.2" fill="#F28CA3" />
-          <path
-            d="M 47.5 41 Q 50 44 52.5 41"
-            stroke="#1E293B"
-            strokeWidth="2"
-            strokeLinecap="round"
-            fill="none"
-          />
-
-          {/* Cyan Hoodie Drawstrings */}
-          <path
-            d="M 47 52 L 44 60 M 53 52 L 56 60"
-            stroke="#12C4C3"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-          <circle cx="44" cy="60.5" r="1.8" fill="#12C4C3" />
-          <circle cx="56" cy="60.5" r="1.8" fill="#12C4C3" />
-        </g>
-      )}
-
-      {/* =====================================================================
-       * CHARACTER 5: COCO (Image 5 - X-Eyes, Peach Head, Teal Band & Romper)
+       * CHARACTER 3: COCO (02_peach_xeyes.png)
        * =================================================================== */}
       {char.id === 'starlight_fox' && (
         <g>
-          {/* Pastel Pink Legs & Coral Boots */}
-          <rect x="40" y="79" width="5.8" height="15" rx="2.8" fill="#F5B1B3" />
-          <rect x="54.2" y="79" width="5.8" height="15" rx="2.8" fill="#F5B1B3" />
-          <rect x="36" y="92" width="11" height="8" rx="3.5" fill="#EF8A6B" />
-          <rect x="53" y="92" width="11" height="8" rx="3.5" fill="#EF8A6B" />
+          {/* Pastel Peach Legs, Yellow Ankle Cuffs & Chunky Coral Boots */}
+          <rect x="39" y="80" width="6.2" height="16" rx="3" fill="#F9B7AC" />
+          <rect x="54.8" y="80" width="6.2" height="16" rx="3" fill="#F9B7AC" />
+          <rect x="37.2" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#FCE192" />
+          <rect x="53" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#FCE192" />
+          <path d="M 31 94.5 H 47 V 105 C 47 107, 29 107, 30 99 Z" fill="#F5906C" />
+          <path d="M 53 94.5 H 69 C 71 99, 70 107, 53 105 Z" fill="#F5906C" />
 
-          {/* Pastel Pink Arms */}
+          {/* Pastel Peach Arms & Round Ball Hands */}
           <path
-            d="M 35 63 L 24 76 M 65 63 L 76 76"
-            stroke="#F5B1B3"
-            strokeWidth="5.8"
+            d="M 34 62 L 22 76 M 66 62 L 78 76"
+            stroke="#F9B7AC"
+            strokeWidth="6.2"
             strokeLinecap="round"
           />
-          <circle cx="23.5" cy="77" r="3.5" fill="#F5B1B3" />
-          <circle cx="76.5" cy="77" r="3.5" fill="#F5B1B3" />
+          <circle cx="21.5" cy="78" r="4.8" fill="#F9B7AC" />
+          <circle cx="78.5" cy="78" r="4.8" fill="#F9B7AC" />
 
-          {/* Teal Rounded Romper Body */}
-          <circle cx="50" cy="69" r="14.5" fill="#0FB8B9" />
+          {/* Teal Rounded Romper Body + Trim Rings */}
+          <circle cx="50" cy="69" r="15.5" fill="#09B8BE" />
+          <rect x="32.5" y="57" width="4" height="11" rx="2" fill="#069CA2" />
+          <rect x="63.5" y="57" width="4" height="11" rx="2" fill="#069CA2" />
+          <rect x="37" y="79" width="9" height="3.2" rx="1.6" fill="#069CA2" />
+          <rect x="54" y="79" width="9" height="3.2" rx="1.6" fill="#069CA2" />
 
           {/* Topknot Yellow Plumes & Double Teal Hairband */}
-          <ellipse cx="43" cy="14" rx="5.5" ry="3.2" transform="rotate(25 43 14)" fill="#F6D48F" />
-          <ellipse cx="57" cy="14" rx="5.5" ry="3.2" transform="rotate(-25 57 14)" fill="#F6D48F" />
-          <ellipse cx="50" cy="13" rx="3.5" ry="5.5" fill="#FDE68A" />
-          <rect x="42" y="17.5" width="16" height="3.5" rx="1.7" fill="#10B8B9" />
-          <rect x="42" y="21" width="16" height="3.5" rx="1.7" fill="#0D9488" />
+          <ellipse cx="41" cy="13.5" rx="7" ry="3.6" transform="rotate(24 41 13.5)" fill="#FCE39C" />
+          <ellipse cx="59" cy="13.5" rx="7" ry="3.6" transform="rotate(-24 59 13.5)" fill="#FCE39C" />
+          <ellipse cx="50" cy="12.5" rx="4" ry="6.2" fill="#FDE68A" />
+          <rect x="41" y="17.5" width="18" height="3.6" rx="1.8" fill="#12D8D8" />
+          <rect x="41" y="21" width="18" height="3.6" rx="1.8" fill="#05B2B2" />
 
           {/* Warm Peach Round Head */}
-          <circle cx="50" cy="41" r="19" fill={`url(#${uid}-peach)`} />
+          <circle cx="50" cy="41" r="20" fill={`url(#${uid}-peach)`} />
 
           {/* Playful X X Eyes & Big Laughing Mouth */}
           <path
-            d="M 41 34 L 46 39 M 46 34 L 41 39 M 54 34 L 59 39 M 59 34 L 54 39"
-            stroke="#1E293B"
-            strokeWidth="2.6"
+            d="M 40.5 34.5 L 46.5 40.5 M 46.5 34.5 L 40.5 40.5 M 53.5 34.5 L 59.5 40.5 M 59.5 34.5 L 53.5 40.5"
+            stroke="#18181B"
+            strokeWidth="2.8"
             strokeLinecap="round"
           />
           <path
-            d="M 43 43 H 57 C 57 52, 43 52, 43 43 Z"
-            fill="#F43F5E"
-            stroke="#FB7185"
+            d="M 42.5 43.5 H 57.5 C 57.5 53.5, 42.5 53.5, 42.5 43.5 Z"
+            fill="#F94C66"
+            stroke="#F43F5E"
             strokeWidth="1.5"
           />
+        </g>
+      )}
+
+      {/* =====================================================================
+       * CHARACTER 4: BLOOM (04_flower.png)
+       * =================================================================== */}
+      {char.id === 'flower_orb' && (
+        <g>
+          {/* Pink Legs, Teal Ankle Cuffs & Gradient Boots */}
+          <rect x="38.5" y="76" width="6.5" height="19" rx="3" fill="#FCA2E6" />
+          <rect x="55" y="76" width="6.5" height="19" rx="3" fill="#FCA2E6" />
+          <rect x="36.8" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#14D4C0" />
+          <rect x="53.4" y="91.5" width="9.8" height="3.2" rx="1.6" fill="#14D4C0" />
+          <path
+            d="M 30 94.5 H 46.5 V 105 C 46.5 107, 29 107, 30 94.5 Z"
+            fill={`url(#${uid}-bloom-boot)`}
+          />
+          <path
+            d="M 53.5 94.5 H 70 C 71 107, 53.5 107, 53.5 105 Z"
+            fill={`url(#${uid}-bloom-boot)`}
+          />
+
+          {/* Side Pink Arms */}
+          <path
+            d="M 22 49 L 17 78 M 78 49 L 83 78"
+            stroke="#FCA2E6"
+            strokeWidth="6"
+            strokeLinecap="round"
+          />
+
+          {/* Main Gradient Orb Body */}
+          <circle cx="50" cy="55" r="28.5" fill={`url(#${uid}-orb)`} />
+          <circle cx="50" cy="55" r="28.5" fill={`url(#${uid}-shine)`} />
+
+          {/* Green Leaves & 7-Petal Pink Flower on Top */}
+          <ellipse cx="42" cy="27" rx="4.2" ry="7.5" transform="rotate(-28 42 27)" fill="#06C896" />
+          <ellipse cx="50" cy="25" rx="4.2" ry="8.5" fill="#10B981" />
+          <ellipse cx="58" cy="27" rx="4.2" ry="7.5" transform="rotate(28 58 27)" fill="#06C896" />
+          <path
+            d="M 50 25 Q 52 13 58 11"
+            stroke="#06C896"
+            strokeWidth="2.8"
+            fill="none"
+          />
+          <g transform="translate(60, 11)">
+            <circle cx="-5.5" cy="-2" r="4" fill="#F875E8" />
+            <circle cx="5.5" cy="-2" r="4" fill="#F875E8" />
+            <circle cx="-3.5" cy="4.2" r="4" fill="#E85BD8" />
+            <circle cx="3.5" cy="4.2" r="4" fill="#E85BD8" />
+            <circle cx="0" cy="-5.5" r="4" fill="#F875E8" />
+            <circle cx="0" cy="0" r="3.8" fill="#FFE619" />
+          </g>
+
+          {/* Glossy Dark Eyes & Thick Yellow Duck Lips */}
+          <circle cx="42.5" cy="50.5" r="5" fill="#18181B" />
+          <circle cx="57.5" cy="50.5" r="5" fill="#18181B" />
+          <circle cx="41" cy="49" r="1.4" fill="#FFFFFF" opacity="0.85" />
+          <circle cx="56" cy="49" r="1.4" fill="#FFFFFF" opacity="0.85" />
+          <rect x="40.5" y="57" width="19" height="9" rx="4.5" fill="#FFE619" />
+          <path d="M 44 61.5 Q 50 63.2 56 61.5" stroke="#CA8A04" strokeWidth="1.5" fill="none" />
+        </g>
+      )}
+
+      {/* =====================================================================
+       * CHARACTER 5: MINT (05_beanie.png)
+       * =================================================================== */}
+      {char.id === 'mint_sprinter' && (
+        <g>
+          {/* Teal Legs, Yellow Ankle Cuffs & Chunky Coral Boots */}
+          <rect x="39" y="79" width="6.5" height="16" rx="3" fill="#06BFC4" />
+          <rect x="54.5" y="79" width="6.5" height="16" rx="3" fill="#06BFC4" />
+          <rect x="37" y="91" width="10.5" height="3.4" rx="1.7" fill="#FDE08D" />
+          <rect x="52.5" y="91" width="10.5" height="3.4" rx="1.7" fill="#FDE08D" />
+          <path d="M 31 94 H 47.5 V 105 C 47.5 107, 29 107, 30 99 Z" fill="#FA8B68" />
+          <path d="M 52.5 94 H 69 C 71 99, 70 107, 52.5 105 Z" fill="#FA8B68" />
+
+          {/* Short Peach Sleeves & Teal Arms/Hands */}
+          <path
+            d="M 33 58 L 22 76 M 67 58 L 78 76"
+            stroke="#06BFC4"
+            strokeWidth="6.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 34 57 L 28 65 M 66 57 L 72 65"
+            stroke="#FCA568"
+            strokeWidth="8.5"
+            strokeLinecap="round"
+          />
+          <circle cx="21" cy="78" r="4.2" fill="#06BFC4" />
+          <circle cx="79" cy="78" r="4.2" fill="#06BFC4" />
+
+          {/* Flared A-line Peach-to-Coral Tunic */}
+          <path
+            d="M 34 55 C 28 63, 26 81, 30 83 H 70 C 74 81, 72 63, 66 55 Z"
+            fill={`url(#${uid}-tunic)`}
+          />
+
+          {/* Big Round Teal Head */}
+          <circle cx="50" cy="38" r="21" fill={`url(#${uid}-teal)`} />
+
+          {/* Eyes, Cheeks & Smile */}
+          <circle cx="43.5" cy="39" r="5" fill="#FFFFFF" />
+          <circle cx="56.5" cy="39" r="5" fill="#FFFFFF" />
+          <circle cx="43.5" cy="39" r="3.4" fill="#18181B" />
+          <circle cx="56.5" cy="39" r="3.4" fill="#18181B" />
+          <circle cx="42.3" cy="37.8" r="1.1" fill="#FFFFFF" />
+          <circle cx="55.3" cy="37.8" r="1.1" fill="#FFFFFF" />
+          <ellipse cx="36.5" cy="44" rx="4.4" ry="2.5" fill="#F794AC" />
+          <ellipse cx="63.5" cy="44" rx="4.4" ry="2.5" fill="#F794AC" />
+          <path
+            d="M 46.8 44 Q 50 47.8 53.2 44"
+            stroke="#18181B"
+            strokeWidth="2.3"
+            strokeLinecap="round"
+            fill="none"
+          />
+
+          {/* Cream-Yellow Rolled-Brim Beanie Hat */}
+          <path
+            d="M 30 23 C 31 9, 69 9, 70 23 Z"
+            fill={`url(#${uid}-hat)`}
+          />
+          <rect x="26" y="19.5" width="48" height="7" rx="3.5" fill="#FDD57E" />
         </g>
       )}
     </svg>
@@ -453,6 +486,642 @@ export const Character3DThumbnail: React.FC<{
 /* ============================================================================
  * 1. HOME SCREEN (#screen-home | camera: portrait)
  * ========================================================================== */
+const GlossyPastelHeroLogo: React.FC<{ className?: string }> = ({
+  className = 'w-full max-w-[460px] h-auto',
+}) => {
+  const uid = React.useId().replace(/:/g, '');
+  return (
+    <svg
+      viewBox="0 0 920 620"
+      className={className}
+      role="img"
+      aria-label="Run At Your Pace"
+    >
+      <defs>
+        {/* 3D Inflated Balloon / Glossy Vinyl Filter */}
+        <filter
+          id={`${uid}-balloon`}
+          x="-12%"
+          y="-12%"
+          width="124%"
+          height="128%"
+          colorInterpolationFilters="sRGB"
+        >
+          {/* Soft drop shadow for 3D depth */}
+          <feDropShadow
+            dx="0"
+            dy="8"
+            stdDeviation="7"
+            floodColor="#070818"
+            floodOpacity="0.38"
+            result="dropShadow"
+          />
+          {/* Smooth pillow heightmap from alpha */}
+          <feGaussianBlur
+            in="SourceAlpha"
+            stdDeviation="8.5"
+            result="blurAlpha"
+          />
+          {/* Studio top-left 3D specular highlight */}
+          <feSpecularLighting
+            in="blurAlpha"
+            surfaceScale="9"
+            specularConstant="0.85"
+            specularExponent="26"
+            lightingColor="#FFFFFF"
+            result="specRaw"
+          >
+            <fePointLight x="260" y="60" z="360" />
+          </feSpecularLighting>
+          <feComposite
+            in="specRaw"
+            in2="SourceAlpha"
+            operator="in"
+            result="specClipped"
+          />
+          {/* Subtle rim shade */}
+          <feGaussianBlur
+            in="SourceAlpha"
+            stdDeviation="4"
+            result="rimBlur"
+          />
+          <feSpecularLighting
+            in="rimBlur"
+            surfaceScale="4"
+            specularConstant="0.32"
+            specularExponent="14"
+            lightingColor="#FFFDF8"
+            result="rimRaw"
+          >
+            <fePointLight x="740" y="540" z="240" />
+          </feSpecularLighting>
+          <feComposite
+            in="rimRaw"
+            in2="SourceAlpha"
+            operator="in"
+            result="rimClipped"
+          />
+          <feMerge>
+            <feMergeNode in="dropShadow" />
+            <feMergeNode in="SourceGraphic" />
+            <feMergeNode in="rimClipped" />
+            <feMergeNode in="specClipped" />
+          </feMerge>
+        </filter>
+
+        {/* Soft blur for specular white shine streaks */}
+        <filter id={`${uid}-shine`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="2.6" />
+        </filter>
+
+        {/* --- Row 1 Gradients: R, u, n --- */}
+        <linearGradient id={`${uid}-R`} x1="0" y1="0" x2="0.15" y2="1">
+          <stop offset="0%" stopColor="#FFF9B6" />
+          <stop offset="32%" stopColor="#E6F8B2" />
+          <stop offset="68%" stopColor="#84E9D0" />
+          <stop offset="100%" stopColor="#48C9E2" />
+        </linearGradient>
+        <linearGradient id={`${uid}-u1`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFD2E4" />
+          <stop offset="50%" stopColor="#FF9EC4" />
+          <stop offset="100%" stopColor="#F576AA" />
+        </linearGradient>
+        <linearGradient id={`${uid}-n`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#E9D4FF" />
+          <stop offset="45%" stopColor="#C59BFF" />
+          <stop offset="82%" stopColor="#7ADCF0" />
+          <stop offset="100%" stopColor="#4CC9E8" />
+        </linearGradient>
+
+        {/* --- Row 2 Gradients: At Your --- */}
+        <linearGradient id={`${uid}-knot`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#D9F99D" />
+          <stop offset="48%" stopColor="#6EE7B7" />
+          <stop offset="100%" stopColor="#22D3EE" />
+        </linearGradient>
+        <linearGradient id={`${uid}-A1`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFDFB3" />
+          <stop offset="55%" stopColor="#FCA590" />
+          <stop offset="100%" stopColor="#F47C7C" />
+        </linearGradient>
+        <linearGradient id={`${uid}-t`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FDE68A" />
+          <stop offset="48%" stopColor="#FDBA74" />
+          <stop offset="100%" stopColor="#F99BBC" />
+        </linearGradient>
+        <linearGradient id={`${uid}-Y`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#A7F3D0" />
+          <stop offset="55%" stopColor="#6EE7C8" />
+          <stop offset="100%" stopColor="#4ADEA8" />
+        </linearGradient>
+        <linearGradient id={`${uid}-o`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF7AE" />
+          <stop offset="55%" stopColor="#FDE068" />
+          <stop offset="100%" stopColor="#F6C445" />
+        </linearGradient>
+        <linearGradient id={`${uid}-u2`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#EBD9FF" />
+          <stop offset="55%" stopColor="#C49BFF" />
+          <stop offset="100%" stopColor="#9B6EF3" />
+        </linearGradient>
+        <linearGradient id={`${uid}-r`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFD4E8" />
+          <stop offset="55%" stopColor="#FF97C1" />
+          <stop offset="100%" stopColor="#EC669F" />
+        </linearGradient>
+
+        {/* --- Row 3 Gradients: PACe --- */}
+        <linearGradient id={`${uid}-P`} x1="0.8" y1="0" x2="0.1" y2="1">
+          <stop offset="0%" stopColor="#A5F8D8" />
+          <stop offset="45%" stopColor="#6BE7DE" />
+          <stop offset="100%" stopColor="#4BB8F5" />
+        </linearGradient>
+        <linearGradient id={`${uid}-A2`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF7BE" />
+          <stop offset="55%" stopColor="#FDE088" />
+          <stop offset="100%" stopColor="#F5BD58" />
+        </linearGradient>
+        <linearGradient id={`${uid}-C`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFD8EC" />
+          <stop offset="55%" stopColor="#FFA2CE" />
+          <stop offset="100%" stopColor="#F473B2" />
+        </linearGradient>
+        <linearGradient id={`${uid}-e`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#EDE0FF" />
+          <stop offset="55%" stopColor="#C69DFF" />
+          <stop offset="100%" stopColor="#9B6CFA" />
+        </linearGradient>
+
+        {/* --- Hoodie Character & Accents Gradients --- */}
+        <linearGradient id={`${uid}-hood`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF4BD" />
+          <stop offset="65%" stopColor="#FCE08B" />
+          <stop offset="100%" stopColor="#F4C762" />
+        </linearGradient>
+        <linearGradient id={`${uid}-torso`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF2A8" />
+          <stop offset="48%" stopColor="#D7F4B8" />
+          <stop offset="85%" stopColor="#58DFCE" />
+          <stop offset="100%" stopColor="#26C3B8" />
+        </linearGradient>
+        <linearGradient id={`${uid}-armL`} x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF1A8" />
+          <stop offset="55%" stopColor="#8CF0CA" />
+          <stop offset="100%" stopColor="#33CECA" />
+        </linearGradient>
+        <linearGradient id={`${uid}-armR`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#35D0CA" />
+          <stop offset="60%" stopColor="#B8F4BE" />
+          <stop offset="100%" stopColor="#FFF0A6" />
+        </linearGradient>
+        <linearGradient id={`${uid}-skin`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFE4C8" />
+          <stop offset="100%" stopColor="#F7BA93" />
+        </linearGradient>
+        <linearGradient id={`${uid}-hair`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#67F2DF" />
+          <stop offset="100%" stopColor="#19C5BA" />
+        </linearGradient>
+        <linearGradient id={`${uid}-shoe`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#72F2E2" />
+          <stop offset="60%" stopColor="#2DD4CA" />
+          <stop offset="100%" stopColor="#14B2AD" />
+        </linearGradient>
+        <linearGradient id={`${uid}-ray`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF9B8" />
+          <stop offset="100%" stopColor="#FACC15" />
+        </linearGradient>
+        <linearGradient id={`${uid}-dash`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F5D0FE" />
+          <stop offset="100%" stopColor="#F472B6" />
+        </linearGradient>
+      </defs>
+
+      {/* ====================================================================
+          DECORATIVE 3D ACCENTS (Rays, Motion Dashes, Pretzel Knot, Star, Swirl)
+          ==================================================================== */}
+      <g filter={`url(#${uid}-balloon)`}>
+        {/* 3 Yellow Sun Rays top-left of R */}
+        <line
+          x1="126"
+          y1="62"
+          x2="148"
+          y2="104"
+          stroke={`url(#${uid}-ray)`}
+          strokeWidth="22"
+          strokeLinecap="round"
+        />
+        <line
+          x1="88"
+          y1="115"
+          x2="130"
+          y2="136"
+          stroke={`url(#${uid}-ray)`}
+          strokeWidth="22"
+          strokeLinecap="round"
+        />
+        <line
+          x1="96"
+          y1="184"
+          x2="132"
+          y2="168"
+          stroke={`url(#${uid}-ray)`}
+          strokeWidth="22"
+          strokeLinecap="round"
+        />
+
+        {/* 2 Pink Motion Lines above 'n' */}
+        <path
+          d="M 548 96 Q 580 108 606 124"
+          stroke={`url(#${uid}-dash)`}
+          strokeWidth="21"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M 510 138 Q 550 144 584 156"
+          stroke={`url(#${uid}-u1)`}
+          strokeWidth="22"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* Green-to-Aqua Intertwined Pretzel Loop left of 'At' */}
+        <path
+          d="M 164 368 C 148 392, 102 385, 98 345 C 94 305, 134 298, 136 332 C 138 368, 92 405, 70 388 C 52 372, 68 338, 108 352"
+          stroke={`url(#${uid}-knot)`}
+          strokeWidth="22"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* 4-Point Yellow Star on right */}
+        <path
+          d="M 852 346 Q 856 368 876 372 Q 856 376 852 398 Q 848 376 828 372 Q 848 368 852 346 Z"
+          fill={`url(#${uid}-ray)`}
+          stroke={`url(#${uid}-ray)`}
+          strokeWidth="10"
+          strokeLinejoin="round"
+        />
+
+        {/* Pink Curly Loop below Hoodie's foot */}
+        <path
+          d="M 712 522 C 718 492, 762 492, 766 525 C 770 554, 738 556, 740 530 C 742 502, 788 504, 798 548"
+          stroke={`url(#${uid}-u1)`}
+          strokeWidth="20"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </g>
+
+      {/* ====================================================================
+          RUNNING HOODIE CHARACTER (Right side, integrated with letters)
+          ==================================================================== */}
+      <g filter={`url(#${uid}-balloon)`}>
+        {/* Back leg & back turquoise sneaker (behind 'r') */}
+        <path
+          d="M 656 382 L 634 432"
+          stroke={`url(#${uid}-skin)`}
+          strokeWidth="34"
+          strokeLinecap="round"
+        />
+        <ellipse
+          cx="624"
+          cy="438"
+          rx="24"
+          ry="34"
+          transform="rotate(24 624 438)"
+          fill={`url(#${uid}-shoe)`}
+        />
+
+        {/* Left Arm extending behind 'n'/'u' */}
+        <ellipse
+          cx="592"
+          cy="322"
+          rx="24"
+          ry="19"
+          transform="rotate(-25 592 322)"
+          fill={`url(#${uid}-skin)`}
+        />
+        <path
+          d="M 664 286 Q 624 278 602 310"
+          stroke={`url(#${uid}-armL)`}
+          strokeWidth="44"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* Plump Rounded Hoodie Torso (Yellow top -> Aqua bottom) */}
+        <path
+          d="M 642 268 C 618 298, 616 364, 650 382 C 684 398, 742 396, 766 374 C 788 352, 782 294, 754 268 Z"
+          fill={`url(#${uid}-torso)`}
+        />
+
+        {/* Front Striding Right Leg + Yellow Cuff + Chunky Aqua Sneaker */}
+        <path
+          d="M 702 374 L 748 436"
+          stroke={`url(#${uid}-skin)`}
+          strokeWidth="38"
+          strokeLinecap="round"
+        />
+        {/* Cream-Yellow Ankle Sock Roll */}
+        <rect
+          x="724"
+          y="414"
+          width="52"
+          height="22"
+          rx="11"
+          transform="rotate(-32 750 425)"
+          fill={`url(#${uid}-hood)`}
+        />
+        {/* Chunky Aqua Sneaker */}
+        <g transform="translate(772, 444) rotate(-26)">
+          <rect
+            x="-36"
+            y="-18"
+            width="84"
+            height="44"
+            rx="22"
+            fill={`url(#${uid}-shoe)`}
+          />
+          <rect
+            x="-36"
+            y="12"
+            width="84"
+            height="16"
+            rx="8"
+            fill="#67F2DF"
+          />
+        </g>
+
+        {/* Right Arm bent upward with Peach Fist */}
+        <path
+          d="M 746 286 Q 786 308 806 276"
+          stroke={`url(#${uid}-armR)`}
+          strokeWidth="42"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <circle cx="814" cy="260" r="23" fill={`url(#${uid}-skin)`} />
+
+        {/* Big Round Yellow Hood */}
+        <circle cx="704" cy="196" r="102" fill={`url(#${uid}-hood)`} />
+        {/* Inner Hood Rim Shadow */}
+        <ellipse cx="708" cy="202" rx="76" ry="70" fill="#E8B258" />
+        {/* Warm Peach Face */}
+        <ellipse cx="708" cy="204" rx="72" ry="66" fill={`url(#${uid}-skin)`} />
+
+        {/* Center-Parted Aqua-Turquoise Bangs */}
+        <path
+          d="M 636 206 C 634 154, 672 134, 708 136 C 692 166, 666 194, 636 206 Z"
+          fill={`url(#${uid}-hair)`}
+        />
+        <path
+          d="M 780 186 C 776 148, 742 134, 708 136 C 724 162, 752 178, 780 186 Z"
+          fill={`url(#${uid}-hair)`}
+        />
+
+        {/* Hoodie Drawstrings & Beads */}
+        <path
+          d="M 696 272 Q 684 292 682 308"
+          stroke="#19C5BA"
+          strokeWidth="7"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M 714 272 Q 726 292 728 308"
+          stroke="#19C5BA"
+          strokeWidth="7"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <circle cx="681" cy="312" r="8" fill="#19C5BA" />
+        <circle cx="729" cy="312" r="8" fill="#19C5BA" />
+      </g>
+
+      {/* Crisp Face Features on Hoodie (Eyes, Cheeks, Smile) */}
+      <g>
+        {/* White Sclera Ovals */}
+        <ellipse cx="686" cy="210" rx="18" ry="20" fill="#FFFFFF" />
+        <ellipse cx="734" cy="208" rx="18" ry="20" fill="#FFFFFF" />
+        {/* Big Dark Pupils */}
+        <circle cx="688" cy="212" r="12.5" fill="#23252E" />
+        <circle cx="732" cy="210" r="12.5" fill="#23252E" />
+        {/* Eye Catchlights */}
+        <circle cx="683" cy="206" r="3.5" fill="#FFFFFF" />
+        <circle cx="727" cy="204" r="3.5" fill="#FFFFFF" />
+        {/* Rosy Pink Cheeks */}
+        <ellipse cx="664" cy="232" rx="13" ry="7.5" fill="#F896AC" opacity="0.85" />
+        <ellipse cx="754" cy="228" rx="13" ry="7.5" fill="#F896AC" opacity="0.85" />
+        {/* Happy U-Smile */}
+        <path
+          d="M 698 234 C 702 248, 718 248, 722 232"
+          stroke="#23252E"
+          strokeWidth="6.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </g>
+
+      {/* ====================================================================
+          ROW 1: "Run" (Plump 3D Bubble Typography)
+          ==================================================================== */}
+      <g filter={`url(#${uid}-balloon)`}>
+        {/* Letter 'R' */}
+        <path
+          d="M 184 282 L 184 146 C 184 128, 258 124, 266 168 C 272 204, 224 216, 196 214 M 228 214 L 278 278"
+          stroke={`url(#${uid}-R)`}
+          strokeWidth="68"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* Inner dimple of 'R' */}
+        <ellipse cx="222" cy="172" rx="13" ry="16" fill="#2B9E8F" opacity="0.85" />
+
+        {/* Letter 'u' */}
+        <path
+          d="M 334 192 L 336 254 C 338 286, 404 286, 408 252 L 412 190"
+          stroke={`url(#${uid}-u1)`}
+          strokeWidth="62"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* Letter 'n' */}
+        <path
+          d="M 464 294 L 476 202 M 474 226 C 488 194, 554 198, 550 238 L 544 304"
+          stroke={`url(#${uid}-n)`}
+          strokeWidth="60"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </g>
+
+      {/* ====================================================================
+          ROW 3: "PACe" (Drawn slightly behind Row 2 bottoms for natural overlap)
+          ==================================================================== */}
+      <g filter={`url(#${uid}-balloon)`}>
+        {/* Giant Letter 'P' */}
+        <path
+          d="M 176 550 L 172 444 C 170 416, 264 412, 266 462 C 268 504, 198 506, 178 498"
+          stroke={`url(#${uid}-P)`}
+          strokeWidth="74"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <ellipse cx="216" cy="462" rx="15" ry="13" fill="#0F8B8D" opacity="0.85" />
+
+        {/* Giant Letter 'A' */}
+        <path
+          d="M 298 552 L 356 440 L 404 552 M 322 518 L 382 518"
+          stroke={`url(#${uid}-A2)`}
+          strokeWidth="66"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <polygon points="354,474 342,502 366,502" fill="#D97706" opacity="0.85" />
+
+        {/* Giant Letter 'C' */}
+        <path
+          d="M 526 468 C 492 444, 452 464, 454 512 C 456 558, 498 568, 528 544"
+          stroke={`url(#${uid}-C)`}
+          strokeWidth="64"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* Giant Letter 'e' */}
+        <path
+          d="M 578 514 L 660 498 C 658 456, 574 456, 574 514 C 574 566, 636 572, 662 548"
+          stroke={`url(#${uid}-e)`}
+          strokeWidth="60"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M 596 496 C 602 478, 630 476, 636 490 Z"
+          fill="#5B21B6"
+          opacity="0.8"
+        />
+      </g>
+
+      {/* ====================================================================
+          ROW 2: "At Your" (Middle Row Overlapping Smoothly)
+          ==================================================================== */}
+      <g filter={`url(#${uid}-balloon)`}>
+        {/* Letter 'A' */}
+        <path
+          d="M 192 386 L 234 316 L 268 388 M 208 364 L 252 364"
+          stroke={`url(#${uid}-A1)`}
+          strokeWidth="46"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <polygon points="233,338 225,354 241,354" fill="#B91C1C" opacity="0.65" />
+
+        {/* Letter 't' */}
+        <path
+          d="M 316 322 L 314 394 C 314 406, 332 406, 336 398 M 296 352 L 336 352"
+          stroke={`url(#${uid}-t)`}
+          strokeWidth="42"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* Letter 'Y' */}
+        <path
+          d="M 380 326 L 414 366 L 448 326 M 414 366 L 414 408"
+          stroke={`url(#${uid}-Y)`}
+          strokeWidth="46"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* Letter 'o' */}
+        <circle
+          cx="492"
+          cy="386"
+          r="27"
+          stroke={`url(#${uid}-o)`}
+          strokeWidth="40"
+          fill="none"
+        />
+        <circle cx="492" cy="386" r="9" fill="#B45309" opacity="0.75" />
+
+        {/* Letter 'u' */}
+        <path
+          d="M 552 364 L 552 402 C 552 420, 594 420, 594 400 L 594 364"
+          stroke={`url(#${uid}-u2)`}
+          strokeWidth="40"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+
+        {/* Letter 'r' */}
+        <path
+          d="M 638 416 L 638 374 C 638 366, 664 364, 674 374"
+          stroke={`url(#${uid}-r)`}
+          strokeWidth="42"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </g>
+
+      {/* ====================================================================
+          CRISP SPECULAR GLOSSY HIGHLIGHTS (White Pill Reflections on Top)
+          ==================================================================== */}
+      <g
+        fill="none"
+        stroke="#FFFFFF"
+        strokeLinecap="round"
+        opacity="0.72"
+        filter={`url(#${uid}-shine)`}
+      >
+        {/* R, u, n gloss */}
+        <path d="M 176 132 C 204 114, 248 118, 264 142" strokeWidth="9" />
+        <path d="M 164 166 L 164 235" strokeWidth="8" />
+        <path d="M 322 180 L 322 224" strokeWidth="8" />
+        <path d="M 402 178 L 402 220" strokeWidth="8" />
+        <path d="M 456 190 L 452 240" strokeWidth="8" />
+        <path d="M 516 196 C 534 198, 548 210, 550 232" strokeWidth="8" />
+
+        {/* At Your gloss */}
+        <path d="M 218 314 L 194 356" strokeWidth="6" />
+        <path d="M 310 316 L 310 342" strokeWidth="6" />
+        <path d="M 374 320 L 394 344" strokeWidth="6" />
+        <path d="M 476 356 C 488 348, 504 350, 512 360" strokeWidth="6" />
+        <path d="M 546 358 L 546 386" strokeWidth="5.5" />
+        <path d="M 632 368 L 632 396" strokeWidth="5.5" />
+
+        {/* PACe gloss */}
+        <path d="M 164 424 C 194 406, 246 412, 262 438" strokeWidth="10" />
+        <path d="M 154 456 L 156 520" strokeWidth="8" />
+        <path d="M 342 428 L 312 492" strokeWidth="9" />
+        <path d="M 464 456 C 484 440, 512 442, 528 454" strokeWidth="9" />
+        <path d="M 578 468 C 602 450, 636 454, 652 474" strokeWidth="9" />
+
+        {/* Hoodie gloss */}
+        <path d="M 642 132 C 674 104, 730 102, 764 128" strokeWidth="10" />
+        <path d="M 790 416 C 804 410, 818 414, 824 424" strokeWidth="6" />
+      </g>
+    </svg>
+  );
+};
+
 export const HomeScreenOverlay: React.FC<{
   isLoadingRuns: boolean;
   onClickMyRuns: () => void;
@@ -462,21 +1131,10 @@ export const HomeScreenOverlay: React.FC<{
       id="screen-home"
       className="fixed inset-0 z-30 pointer-events-none flex flex-col justify-center p-6 sm:p-12 select-none"
     >
-      {/* Left-aligned Hero Typography + 'Run!' Button only */}
+      {/* Left-aligned Hero Logo + Subtitle + 'Run!' Button over 3D Portrait World */}
       <div className="my-auto max-w-2xl space-y-6 pointer-events-auto">
         <div className="space-y-3">
-          <h1
-            className="font-display font-extrabold tracking-tight text-white leading-[0.96] drop-shadow-[0_8px_30px_rgba(0,0,0,0.65)]"
-            style={{
-              fontSize: 'clamp(2.8rem, min(10vw, 18vh), 6.8rem)',
-            }}
-          >
-            Run at
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d1bcd6] via-[#FF85B8] to-[#FDE68A]">
-              Your Pace
-            </span>
-          </h1>
+          <GlossyPastelHeroLogo className="w-full max-w-[420px] sm:max-w-[500px] h-auto -ml-4" />
           <p className="text-lg sm:text-2xl font-medium text-slate-200 tracking-tight drop-shadow">
             The route you ran becomes the course.
           </p>

@@ -69,7 +69,7 @@ const PLAY_CAMERA_SEQUENCE: CameraModeId[] = [
 ];
 
 const STORAGE_KEY_RECORDS = 'pace_runner_course_records_v1';
-const STORAGE_KEY_MAIN_CHAR = 'pace_runner_main_character_v1';
+const STORAGE_KEY_MAIN_CHAR = 'pace_runner_main_character_v2';
 
 export default function App() {
   const [courses, setCourses] = useState<GpxCourseData[]>(PRESET_COURSES);
@@ -577,23 +577,7 @@ export default function App() {
           onChangeCharacter={handleSelectMainCharacter}
           onTriggerUploadGpx={() => fileInputRef.current?.click()}
           onReturnTo3DWorld={() => handleQuickLaunchCourse(activeCourse)}
-          onOpenStats={() => {
-            setStatsReturnScreen('select');
-            setScreen('stats');
-          }}
           onOpenHome={() => setScreen('home')}
-        />
-      )}
-
-      {/* 3. MY STATS SCREEN (#screen-stats) */}
-      {screen === 'stats' && (
-        <StatsScreenOverlay
-          courses={courses}
-          courseRecords={courseRecords}
-          mainCharacterId={mainCharacterId}
-          onSelectMainCharacter={handleSelectMainCharacter}
-          onBack={() => setScreen(statsReturnScreen)}
-          onSelectCourseFromStats={(course) => handlePreviewCourse(course)}
         />
       )}
 
