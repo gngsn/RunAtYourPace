@@ -1,0 +1,6 @@
+{
+  "name": "Somteol Run — 파스텔 3D GPX 러닝 월드",
+  "description": "GPX 러닝 데이터와 Google Maps 주변 환경을 반영하여 양모 펠트 캐릭터가 분홍빛 털나무 초원과 솜털 구름 위를 달리는 3D 감성 러닝 리플레이어",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
